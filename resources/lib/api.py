@@ -3,13 +3,14 @@ from __future__ import unicode_literals
 
 import urlquick
 from xbmc import executebuiltin
+from xbmcgui import Dialog
 from functools import reduce
-from .contants import API_BASE_URL, BASE_HEADERS, url_constructor
-import resources.lib.utils as U
+from resources.lib.contants import API_BASE_URL, BASE_HEADERS, url_constructor
+from resources.lib.utils import deep_get, updateQueryParams, qualityFilter
 from codequick import Script
+from codequick.script import Settings
 from codequick.storage import PersistentDict
-from urllib import quote_plus
-from urlparse import urlparse, parse_qs
+from urllib.parse import quote_plus, urlparse, parse_qsl
 import time
 import hashlib
 import hmac
@@ -17,8 +18,6 @@ import json
 import re
 from uuid import uuid4
 from base64 import b64decode
-
-deep_get = U.deep_get
 
 
 class HotstarAPI:
@@ -53,22 +52,42 @@ class HotstarAPI:
         else:
             results = deep_get(results, "body.results")
 
-        items = results.get("items") or deep_get(
-            results, "assets.items") or (results.get("map") and results.get("map").values())
-        nextPageUrl = deep_get(
-            results, "assets.nextOffsetURL") or results.get("nextOffsetURL")
-        return items, nextPageUrl
+        if results:
+            items = results.get("items") or deep_get(results, "assets.items") or (results.get(
+                "map") and results.get("map").values()) or deep_get(results, "trays.items") or []
+            nextPageUrl = deep_get(
+                results, "assets.nextOffsetURL") or results.get("nextOffsetURL")
 
-    def getPlay(self, contentId, subtag, drm=False, lang=None):
-        url = url_constructor("/play/v1/playback/content/%s" % contentId)
+            totalResults = deep_get(
+                results, "assets.totalResults") or results.get("totalResults")
+            offset = deep_get(
+                results, "assets.offset") or results.get("offset")
+            allResultsPageUrl = None
+            if len(items) > 0 and nextPageUrl is not None and ("/season/" in nextPageUrl or items[0].get("assetType") == "EPISODE") and totalResults is not None:
+                allResultsPageUrl = updateQueryParams(nextPageUrl, {"size": str(
+                    totalResults), "tas": str(totalResults), "offset": "0"})
+
+            if deep_get(results, "channelClip.clipType", "") == "LIVE":
+                items.insert(0, deep_get(results, "channelClip", {}))
+
+            return items, nextPageUrl, allResultsPageUrl
+        return [], None, None
+
+    def getPlay(self, contentId, subtag, drm=False, lang=None, partner=None, ask=False):
+        url = url_constructor("/play/v1/playback/%scontent/%s" %
+                              ('partner/' if partner is not None else '', contentId))
         encryption = "widevine" if drm else "plain"
-        resp = self.get(
-            url, headers=self._getPlayHeaders(), params=self._getPlayParams(subtag, encryption), max_age=-1)
+        if partner:
+            resp = self.post(url, headers=self._getPlayHeaders(extra={"X-Forwarded-For": "49.34.0.0", "X-HS-Platform": "android", "User-Agent": "KAIOS"}), params=self._getPlayParams(
+                subtag, encryption), max_age=-1, json={"user_id": "", "partner_data": "x", "data": {"third_party_bundle": partner}})
+        else:
+            resp = self.get(url, headers=self._getPlayHeaders(
+            ), params=self._getPlayParams(subtag, encryption), max_age=-1)
         playBackSets = deep_get(resp, "data.playBackSets")
         if playBackSets is None:
             return None, None, None
         playbackUrl, licenceUrl, playbackProto = HotstarAPI._findPlayback(
-            playBackSets, encryption, lang)
+            playBackSets, lang, ask)
         return playbackUrl, licenceUrl, playbackProto
 
     def getExtItem(self, contentId):
@@ -80,7 +99,7 @@ class HotstarAPI:
             return None, None, None
         resp = self.get(url)
         item = deep_get(resp, "body.results.item")
-        if int(contentId) in [1260000033, 1260000025, 1260000034, 1260000024, 1260000035]:
+        if item.get("clipType") == "LIVE":
             item["encrypted"] = True
         return "com.widevine.alpha" if item.get("encrypted") else False, item.get("isSubTagged") and "subs-tag:%s|" % item.get("features")[0].get("subType"), item.get("title")
 
@@ -92,11 +111,12 @@ class HotstarAPI:
         yield (code, 1)
         for i in range(2, 101):
             resp = self.get(url+code, max_age=-1)
+            Script.log(resp, lvl=Script.INFO)
             token = deep_get(resp, "description.userIdentity")
             if token:
                 with PersistentDict("userdata.pickle") as db:
                     db["token"] = token
-                    db["deviceId"] = uuid4()
+                    db["deviceId"] = str(uuid4())
                     db["udata"] = json.loads(json.loads(
                         b64decode(token.split(".")[1]+"========")).get("sub"))
                     if db.get("isGuest"):
@@ -116,14 +136,14 @@ class HotstarAPI:
         try:
             response = self.session.get(url, **kwargs)
             return response.json()
-        except Exception, e:
+        except Exception as e:
             return self._handleError(e, url, "get", **kwargs)
 
     def post(self, url, **kwargs):
         try:
             response = self.session.post(url, **kwargs)
             return response.json()
-        except Exception, e:
+        except Exception as e:
             return self._handleError(e, url, "post", **kwargs)
 
     def _handleError(self, e, url, _rtype, **kwargs):
@@ -132,7 +152,7 @@ class HotstarAPI:
                        url, lvl=Script.DEBUG)
             Script.notify("Internal Error", "")
         elif e.__class__.__name__ == "HTTPError":
-            if e.code == 402 or e.code == 403:
+            if e.response.status_code == 402 or e.response.status_code == 403:
                 with PersistentDict("userdata.pickle") as db:
                     if db.get("isGuest"):
                         Script.notify(
@@ -142,7 +162,7 @@ class HotstarAPI:
                     else:
                         Script.notify(
                             "Subscription Error", "You don't have valid subscription to watch this content", display_time=2000)
-            elif e.code == 401:
+            elif e.response.status_code == 401:
                 new_token = self._refreshToken()
                 if new_token:
                     kwargs.get("headers") and kwargs['headers'].update(
@@ -154,17 +174,19 @@ class HotstarAPI:
                 else:
                     Script.notify("Token Error", "Token not found")
 
-            elif e.code == 474 or e.code == 475:
+            elif e.response.status_code == 474 or e.response.status_code == 475:
                 Script.notify(
                     "VPN Error", "Your VPN provider does not support Hotstar")
             else:
-                raise urlquick.HTTPError(e.filename, e.code, e.msg, e.hdrs)
+                Script.notify("Invalid Response", "{0}: Invalid response from server".format(
+                    e.response.status_code))
             return False
         else:
-            Script.log("Got unexpected response for request url %s" %
-                       url, lvl=Script.DEBUG)
+            Script.log("{0}: Got unexpected response for request url {1}".format(
+                e.__class__.__name__, url), lvl=Script.DEBUG)
             Script.notify(
                 "API Error", "Raise issue if you are continuously facing this error")
+            raise e
 
     def _refreshToken(self):
         try:
@@ -172,7 +194,7 @@ class HotstarAPI:
                 oldToken = db.get("token")
                 if oldToken:
                     resp = self.session.get(url_constructor("/in/aadhar/v2/firetv/in/users/refresh-token"),
-                                            headers={"userIdentity": oldToken, "deviceId": db.get("deviceId", uuid4())}, raise_for_status=False, max_age=-1).json()
+                                            headers={"userIdentity": oldToken, "deviceId": db.get("deviceId", str(uuid4()))}, raise_for_status=False, max_age=-1).json()
                     if resp.get("errorCode"):
                         return resp.get("message")
                     new_token = deep_get(resp, "description.userIdentity")
@@ -180,18 +202,18 @@ class HotstarAPI:
                     db.flush()
                     return new_token
             return False
-        except Exception, e:
+        except Exception as e:
             return e
 
     @staticmethod
-    def _getPlayHeaders(includeST=False, playbackUrl=None):
+    def _getPlayHeaders(includeST=False, playbackUrl=None, extra={}):
         with PersistentDict("userdata.pickle") as db:
             token = db.get("token")
         auth = HotstarAPI._getAuth(includeST)
+        hdnea = None
         if playbackUrl:
-            parsed_url = urlparse(playbackUrl)
-            qs = parse_qs(parsed_url.query)
-            hdnea = "hdnea=%s;" % qs.get("hdnea")[0]
+            query = dict(parse_qsl(list(urlparse(playbackUrl))[4]))
+            hdnea = "hdnea=%s;" % query.get("hdnea", "")
             Script.log(hdnea, lvl=Script.DEBUG)
         return {
             "hotstarauth": auth,
@@ -199,8 +221,9 @@ class HotstarAPI:
             "X-HS-AppVersion": "3.3.0",
             "X-HS-Platform": "firetv",
             "X-HS-UserToken": token,
-            "Cookie": playbackUrl and hdnea,
-            "User-Agent": "Hotstar;in.startv.hotstar/3.3.0 (Android/8.1.0)"
+            "Cookie": hdnea,
+            "User-Agent": "Hotstar;in.startv.hotstar/3.3.0 (Android/8.1.0)",
+            **extra,
         }
 
     @staticmethod
@@ -217,46 +240,50 @@ class HotstarAPI:
     @staticmethod
     def _getPlayParams(subTag="", encryption="widevine"):
         with PersistentDict("userdata.pickle") as db:
-            deviceId = db.get("deviceId") or uuid4()
+            deviceId = db.get("deviceId", str(uuid4()))
         return {
             "os-name": "firetv",
             "desired-config": "audio_channel:stereo|encryption:%s|ladder:tv|package:dash|%svideo_codec:h264" % (encryption, subTag or ""),
-            "device-id": str(deviceId),
+            "device-id": deviceId,
             "os-version": "8.1.0"
         }
 
     @staticmethod
-    def _findPlayback(playBackSets, encryption="widevine", lang=None):
+    def _findPlayback(playBackSets, lang=None, ask=False):
         selected = None
-        defaultRe = ".*?encryption:%s.*?(ladder:tv)?.*?package:dash.*" % encryption
-        plainDashRe = ".*?encryption:plain.*?(ladder:tv)?.*?package:dash.*"
-        plainHlsRe = ".*?encryption:plain.*?(ladder:tv)?.*?package:hls.*"
-        if lang:
-            defaultRe = ".*?encryption:%s.*language:%s.*?(ladder:tv)?.*?package:dash.*" % (
-                encryption, lang)
-            plainDashRe = ".*?encryption:plain.*language:%s.*?(ladder:tv)?.*?package:dash.*" % lang
-            plainHlsRe = ".*?encryption:plain.*language:%s.*?(ladder:tv)?.*?package:hls.*" % lang
+        index = -1
+        options = []
+        quality = {"4k": 0, "hd": 1, "sd": 2}
         for each in playBackSets:
-            Script.log("Checking combination %s for encryption %s" %
-                       (each.get("tagsCombination"), encryption), lvl=Script.DEBUG)
-            if re.match(defaultRe, each.get("tagsCombination")):
-                Script.log("Found Stream! URL : %s LicenceURL: %s Encryption: %s" %
-                           (each.get("playbackUrl"), each.get("licenceUrl"), encryption), lvl=Script.DEBUG)
-                selected = (each.get("playbackUrl"),
-                            each.get("licenceUrl"), "mpd")
-                break
-            elif re.match(plainDashRe, each.get("tagsCombination")):
-                Script.log("Found Stream! URL : %s LicenceURL: %s Encryption: %s" %
-                           (each.get("playbackUrl"), each.get("licenceUrl"), "plain"), lvl=Script.DEBUG)
-                selected = (each.get("playbackUrl"),
-                            each.get("licenceUrl"), "mpd")
-                break
-            elif re.match(plainHlsRe, each.get("tagsCombination")):
-                Script.log("Found Stream! URL : %s LicenceURL: %s Encryption: %s" %
-                           (each.get("playbackUrl"), each.get("licenceUrl"), "plain"), lvl=Script.DEBUG)
-                selected = (each.get("playbackUrl"),
-                            each.get("licenceUrl"), "hls")
-                break
+            config = {k: v for d in map(lambda x: dict([x.split(":")]), each.get(
+                "tagsCombination", "a:b").split(";")) for k, v in d.items()}
+            Script.log(
+                f"Checking combination {config} with language {lang}", lvl=Script.DEBUG)
+            if config.get("encryption", "") in ["plain", "widevine"] and config.get("package", "") in ["hls", "dash"]:
+                if lang and config.get("language") and config.get("language", "") != lang:
+                    continue
+                config["playback"] = (each.get("playbackUrl"), each.get(
+                    "licenceUrl"), "mpd" if config.get("package") == "dash" else "hls")
+                if selected is None:
+                    selected = config["playback"]
+                if config.get("ladder"):
+                    del config["ladder"]
+                if config not in options:
+                    options.append(config)
+        options.sort(key=lambda x: quality.get(x.get("resolution", "sd")))
+        if len(options) > 0:
+            if Settings.get_string("playback_select") == "Ask" or ask:
+                index = Dialog().select("Playback Quality", list(map(lambda x: "Video: {0} - {1} - {2} - {3} | Audio: {4} - {5} | {6}".format(x.get("resolution", "").upper(), x.get(
+                    "dynamic_range", "").upper(), x.get("video_codec", "").upper(), x.get("container", "").upper(), x.get("audio_channel", "").upper(), x.get("audio_codec", "").upper(), "Non-DRM" if x.get("encryption", "plain") == "plain" else "DRM"), options)))
+                if index == -1:
+                    return (None, None, None)
+            else:
+                options = list(filter(qualityFilter, options))
+                if len(options) > 0:
+                    index = 0
+        if len(options) > 0:
+            Script.log("Selected Config {0}".format(options[index]))
+            selected = options[index].get("playback")
         if selected is None:
             selected = (playBackSets[0].get("playbackUrl"), playBackSets[0].get(
                 "licenceUrl"), "hls" if ".m3u8" in playBackSets[0].get("playbackUrl") else "mpd")

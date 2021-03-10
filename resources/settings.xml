@@ -1,8 +1,41 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <settings>
-  <category label="General"><!--General-->
-  <setting label="Account" type="lsep"/><!--Account-->
-  <setting id="login" type="action" label="Login" action="RunPlugin(plugin://plugin.video.botallen.hotstar/resources/lib/main/login/)" option="close"/>
-  <setting id="logout" type="action" label="Logout" action="RunPlugin(plugin://plugin.video.botallen.hotstar/resources/lib/main/logout/)" option="close"/>
+
+  <!--General-->
+  <category label="General">
+    <!--Account-->
+    <setting label="Account" type="lsep"/>
+    <!--Login Action Button-->
+    <setting id="login" type="action" label="Login" action="RunPlugin(plugin://plugin.video.botallen.hotstar/resources/lib/main/login/)" option="close"/>
+    <!--Logout Action Button-->
+    <setting id="logout" type="action" label="Logout" action="RunPlugin(plugin://plugin.video.botallen.hotstar/resources/lib/main/logout/)" option="close"/>
   </category>
+  <!--General-->
+
+
+  <!--Playback-->
+  <category label="Playback">
+    <!--Playback Quality Option-->
+    <setting id="playback_select" type="labelenum" label="Playback Quality" values="Auto|Ask" default="Auto" />
+
+    <setting type="sep"/>
+
+    <!--Auto Playback Priority Settings-->
+    <setting label="Auto Playback Priority" type="lsep" />
+    <!--Video Resolution-->
+    <setting id="resolution" type="enum" label="Video Resolution" values="4K|1080p|720p" default="1" enable="eq(-3,Auto)" />
+    <!--Video Codec-->
+    <setting id="video_codec" type="enum" label="Video Codec" values="Dolby Vision H265|H265|VP9|H264" default="3" enable="eq(-4,Auto)" />
+    <!--Video Dynamic Range-->
+    <setting id="dynamic_range" type="enum" label="Video Dynamic Range" values="Dolby Vision|HDR10|SDR" default="2" enable="eq(-5,Auto)" />
+
+    <setting type="sep"/>
+
+
+    <!--Audio Channel-->
+    <setting id="audio_channel" type="enum" label="Audio Channel" values="Stereo|Dolby 5.1" default="0" enable="eq(-7,Auto)" />
+    <!--Audio Codec-->
+    <setting id="audio_codec" type="enum" label="Audio Codec" values="Dolby Atmos|AAC" default="1" enable="eq(-8,Auto)" />
+  </category>
+  <!--Playback-->
 </settings>

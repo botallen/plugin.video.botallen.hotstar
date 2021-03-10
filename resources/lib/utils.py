@@ -1,10 +1,13 @@
-from functools import wraps
+from functools import wraps, reduce
 from codequick import Script
-from xbmc import executebuiltin
+from codequick.script import Settings
 from codequick.storage import PersistentDict
 from .contants import url_constructor
+from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 import urlquick
 from uuid import uuid4
+
+from xbmc import executebuiltin
 
 
 def deep_get(dictionary, keys, default=None):
@@ -41,3 +44,22 @@ def guestToken():
         "id": str(uuid4()),
     }).json()
     return deep_get(resp, "description.userIdentity")
+
+
+def updateQueryParams(url, params):
+    url_parts = list(urlparse(url))
+    query = dict(parse_qsl(url_parts[4]))
+    query.update(params)
+    url_parts[4] = urlencode(query)
+    return urlunparse(url_parts)
+
+
+def qualityFilter(config):
+    return (
+        config.get("resolution", "hd") == ["4k", "hd", "sd"][Settings.get_int("resolution")] and
+        config.get("video_codec", "h265") == ["dvh265", "h265", "vp9", "h264"][Settings.get_int("video_codec")] and
+        config.get("dynamic_range", "sdr") == ["dv", "hdr10", "sdr"][Settings.get_int("dynamic_range")] and
+        config.get("audio_channel", "stereo") == ["stereo", "dolby51"][Settings.get_int("audio_channel")] and
+        config.get("audio_codec", "aac") == [
+            "ec3", "aac"][Settings.get_int("audio_codec")]
+    )
