@@ -140,8 +140,8 @@ class Builder:
                 "drm": "com.widevine.alpha" if item.get("encrypted") or item.get("clipType", "") == "LIVE" else False,
                 "partner": "com.jio.jioplay.tv" if item.get("clipType", "") == "LIVE" else None
             }
-            context.extend([("Select Playback", "PlayMedia(plugin://plugin.video.botallen.hotstar/resources/lib/main/play_vod/?%s)" %
-                             (urlencode(dict({"ask": True}, **params))))])
+            context.extend([("Select Playback", "PlayMedia(plugin://plugin.video.botallen.hotstar/resources/lib/main/play_vod/?_pickle_=%s)" %
+                             hexlify(dumps(dict({"ask": True}, **params))).decode("ascii"))])
             if len(item.get("langObjs", [])) > 1:
                 context.extend(map(lambda x: ("Play in %s" % x.get("name"), "PlayMedia(plugin://plugin.video.botallen.hotstar/resources/lib/main/play_vod/?_pickle_=%s)" %
                                               hexlify(dumps(dict({"lang": x.get("iso3code")}, **params))).decode("ascii")), item.get("langObjs", [])))
