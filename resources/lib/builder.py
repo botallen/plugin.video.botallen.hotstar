@@ -143,8 +143,8 @@ class Builder:
             context.extend([("Select Playback", "PlayMedia(plugin://plugin.video.botallen.hotstar/resources/lib/main/play_vod/?%s)" %
                              (urlencode(dict({"ask": True}, **params))))])
             if len(item.get("langObjs", [])) > 1:
-                context.extend(map(lambda x: ("Play in %s" % x.get("name"), "PlayMedia(plugin://plugin.video.botallen.hotstar/resources/lib/main/play_vod/?%s)" %
-                                              (urlencode(dict({"lang": x.get("iso3code")}, **params)))), item.get("langObjs", [])))
+                context.extend(map(lambda x: ("Play in %s" % x.get("name"), "PlayMedia(plugin://plugin.video.botallen.hotstar/resources/lib/main/play_vod/?_pickle_=%s)" %
+                                              hexlify(dumps(dict({"lang": x.get("iso3code")}, **params))).decode("ascii")), item.get("langObjs", [])))
 
         label = item.get("title")
         if item.get("clipType", "") == "LIVE":
