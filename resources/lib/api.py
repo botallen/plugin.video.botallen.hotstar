@@ -270,7 +270,7 @@ class HotstarAPI:
                     del config["ladder"]
                 if config not in options:
                     options.append(config)
-        options.sort(key=lambda x: quality.get(x.get("resolution", "sd")))
+        options.sort(key=lambda x: str(quality.get(x.get("resolution", "sd")) or ""))
         if len(options) > 0:
             if Settings.get_string("playback_select") == "Ask" or ask:
                 index = Dialog().select("Playback Quality", list(map(lambda x: "Video: {0} - {1} - {2} - {3} | Audio: {4} - {5} | {6}".format(x.get("resolution", "").upper(), x.get(
