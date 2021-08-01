@@ -6,7 +6,7 @@ from codequick import Listitem, Script, Resolver, Route
 from codequick.storage import PersistentDict
 from urlquick import MAX_AGE
 import inputstreamhelper
-from .contants import url_constructor, IMG_THUMB_H_URL, IMG_POSTER_V_URL, IMG_FANART_H_URL, MEDIA_TYPE, BASE_HEADERS
+from .contants import url_constructor, IMG_THUMB_H_URL, IMG_POSTER_V_URL, IMG_FANART_H_URL, MEDIA_TYPE, BASE_HEADERS, TRAY_IDENTIFIERS, PERSONA_BASE_URL, NAME
 from .api import deep_get, HotstarAPI
 from .utils import updateQueryParams
 from urllib.parse import urlencode
@@ -28,17 +28,29 @@ class Builder:
             item.art['fanart'] = "https://secure-media.hotstar.com/static/firetv/v1/poster_%s_in.jpg" % each.get(
                 "name").lower() if not each.get("name").lower() == "genres" else "https://secure-media.hotstar.com/static/firetv/v1/poster_genre_in.jpg"
             item.set_callback(Route.ref("/resources/lib/main:menu_list") if each.get("pageType") else Route.ref(
-                "/resources/lib/main:tray_list"), url=each.get("pageUri").replace("offset=0&size=20&tao=0&tas=5", "offset=0&size=100&tao=0&tas=15"))
+                "/resources/lib/main:tray_list"), url=updateQueryParams(each.get("pageUri"), {"tas": "15"}))
             item.art.local_thumb(each.get("name").lower() + ".png")
             yield item
 
     def buildSearch(self, callback):
         return Listitem().search(callback, url="")
 
+    def buildSettings(self):
+        return Listitem.from_dict(Route.ref("/resources/lib/main:settings"), "Settings")
+
     def buildPage(self, items, nextPageUrl=None):
         for each in items:
-            if each.get("traySource", "") in ["THIRD_PARTY", "GRAVITY"]:
+            if each.get("traySource", "") in ["THIRD_PARTY"]:
                 continue
+            tray_url = ""
+            if each.get("uri"):
+                tray_url = updateQueryParams(each.get("uri"), {"tas": "15"})
+            if each.get("traySource") == "GRAVITY":
+                path = TRAY_IDENTIFIERS.get(each.get("addIdentifier"))
+                if path:
+                    tray_url = PERSONA_BASE_URL + path
+                else:
+                    continue
             art = info = None
             aItems = deep_get(each, "assets.items")
             if aItems and len(aItems) > 0:
@@ -51,7 +63,6 @@ class Builder:
                     "poster": IMG_POSTER_V_URL % (deep_get(aItems[0], "images.v") or deep_get(aItems[0], "images.h")),
                     "fanart": IMG_FANART_H_URL % deep_get(aItems[0], "images.h"),
                 }
-
             yield Listitem().from_dict(**{
                 "label": "Carousel" if each.get("layoutType", "") == "MASTHEAD" else each.get("title"),
                 "art": art,
@@ -61,7 +72,7 @@ class Builder:
                     "IsPlayable": False
                 },
                 "params": {
-                    "url": updateQueryParams(each.get("uri"), {"tas": "15"}),
+                    "url": tray_url,
                 }
             })
         if nextPageUrl:
@@ -106,7 +117,7 @@ class Builder:
     def _buildItem(self, item):
         context = []
         if item.get("assetType") in ["CHANNEL", "GENRE", "GAME", "LANGUAGE", "SHOW", "SEASON"]:
-            if item.get("assetType", "") in ["SHOW", "GAME"] or item.get("pageType") == "HERO_LANDING_PAGE":
+            if item.get("assetType", "") in ["SHOW"] or item.get("pageType") in ["HERO_LANDING_PAGE", "NAVIGATION_LANDING_PAGE"]:
                 callback = Route.ref("/resources/lib/main:menu_list")
             else:
                 callback = Route.ref("/resources/lib/main:tray_list")
@@ -152,6 +163,12 @@ class Builder:
         elif item.get("assetType") == "SEASON":
             label = "Season {0} ({1})".format(
                 item.get("seasonNo"), item.get("episodeCnt"))
+
+        props = {"IsPlayable": False}
+        if item.get("watched"):
+            props["ResumeTime"] = item.get(
+                "watched", 0) * item.get("duration", 0)
+            props["TotalTime"] = item.get("duration", 0)
         return {
             "label": label,
             "art": {
@@ -177,9 +194,7 @@ class Builder:
                 "dateadded": item.get("broadCastDate") and datetime.fromtimestamp(item.get("broadCastDate")).strftime("%Y-%m-%d %H:%M:%S"),
                 "mediatype": MEDIA_TYPE.get(item.get("assetType"))
             },
-            "properties": {
-                "IsPlayable": False
-            },
+            "properties": props,
             # TODO: Get Stream Info
             # "stream": {
             #     # "video_codec": "h264",

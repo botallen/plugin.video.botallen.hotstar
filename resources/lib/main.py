@@ -5,6 +5,7 @@ from codequick import Route, run, Script, Resolver
 
 import resources.lib.utils as U
 from xbmcgui import DialogProgress
+from xbmc import executebuiltin
 from xbmcplugin import SORT_METHOD_EPISODE, SORT_METHOD_DATE
 import time
 import urlquick
@@ -18,6 +19,7 @@ def root(plugin):
     yield builder.buildSearch(Route.ref("/resources/lib/main:tray_list"))
     menuItmes = api.getMenu()
     yield from builder.buildMenu(menuItmes)
+    yield builder.buildSettings()
 
 
 @Route.register
@@ -82,6 +84,12 @@ def login(plugin):
 @Script.register
 def logout(plugin):
     api.doLogout()
+
+
+@Script.register
+def settings(plugin):
+    executebuiltin("Addon.OpenSettings({0})".format(plugin.get_info("id")))
+    return False
 
 
 api = HotstarAPI()

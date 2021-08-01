@@ -11,6 +11,7 @@ from codequick import Script
 from codequick.script import Settings
 from codequick.storage import PersistentDict
 from urllib.parse import quote_plus, urlparse, parse_qsl
+from urllib.request import urlopen, Request
 import time
 import hashlib
 import hmac
@@ -34,8 +35,8 @@ class HotstarAPI:
 
     def getPage(self, url):
         results = deep_get(self.get(url), "body.results")
-        itmes = deep_get(results, "trays.items", []
-                         ) or results.get("items", [])
+        itmes = deep_get(results, "trays.items", []) or results.get(
+            "items", [])
         nextPageUrl = results.get("nextOffsetURL") or deep_get(
             results, "trays.nextOffsetURL")
         return itmes, nextPageUrl
@@ -44,17 +45,30 @@ class HotstarAPI:
         if search_query:
             url = url_constructor("/s/v1/scout?q=%s&size=30" %
                                   quote_plus(search_query))
-        results = self.get(url)
+        if "persona" in url:
+            with PersistentDict("userdata.pickle") as db:
+                pid = db.get("udata", {}).get("pId")
+            results = self.get(url.format(pid=pid), headers={
+                               "hotstarauth": self._getAuth(includeST=True, persona=True)})
+            # ids = ",".join(map(lambda x: x.get("item_id"),
+            #                deep_get(results, "data.items")))
+            # url = url_constructor("/o/v1/multi/get/content?ids=" + ids)
+        else:
+            results = self.get(url)
 
         if "data" in results:
             results = results.get("data")
-            results['items'] = deep_get(results, "data.itmes").values()
+            if "progress_meta" in results and type(results.get("items")) is dict:
+                for cID, data in results.get("progress_meta").items():
+                    results["items"][cID].update(data)
         else:
             results = deep_get(results, "body.results")
 
         if results:
             items = results.get("items") or deep_get(results, "assets.items") or (results.get(
-                "map") and results.get("map").values()) or deep_get(results, "trays.items") or []
+                "map") and list(results.get("map").values())) or deep_get(results, "trays.items") or []
+            if type(items) is dict:
+                items = list(items.values())
             nextPageUrl = deep_get(
                 results, "assets.nextOffsetURL") or results.get("nextOffsetURL")
 
@@ -78,7 +92,7 @@ class HotstarAPI:
                               ('partner/' if partner is not None else '', contentId))
         encryption = "widevine" if drm else "plain"
         if partner:
-            resp = self.post(url, headers=self._getPlayHeaders(extra={"X-Forwarded-For": "49.34.0.0", "X-HS-Platform": "android", "User-Agent": "KAIOS"}), params=self._getPlayParams(
+            resp = self.post(url, headers=self._getPlayHeaders(extra={"X-HS-Platform": "android"}), params=self._getPlayParams(
                 subtag, encryption), max_age=-1, json={"user_id": "", "partner_data": "x", "data": {"third_party_bundle": partner}})
         else:
             resp = self.get(url, headers=self._getPlayHeaders(
@@ -177,6 +191,10 @@ class HotstarAPI:
             elif e.response.status_code == 474 or e.response.status_code == 475:
                 Script.notify(
                     "VPN Error", "Your VPN provider does not support Hotstar")
+            elif e.response.status_code == 404 and e.response.headers.get("Content-Type") == "application/json":
+                if e.response.json().get("errorCode") == "ERR_PB_1412":
+                    Script.notify("Network Error",
+                                  "Use Jio network to play this content")
             else:
                 Script.notify("Invalid Response", "{0}: Invalid response from server".format(
                     e.response.status_code))
@@ -210,25 +228,28 @@ class HotstarAPI:
         with PersistentDict("userdata.pickle") as db:
             token = db.get("token")
         auth = HotstarAPI._getAuth(includeST)
-        hdnea = None
-        if playbackUrl:
-            query = dict(parse_qsl(list(urlparse(playbackUrl))[4]))
-            hdnea = "hdnea=%s;" % query.get("hdnea", "")
-            Script.log(hdnea, lvl=Script.DEBUG)
-        return {
+        headers = {
             "hotstarauth": auth,
             "X-Country-Code": "in",
             "X-HS-AppVersion": "3.3.0",
             "X-HS-Platform": "firetv",
             "X-HS-UserToken": token,
-            "Cookie": hdnea,
             "User-Agent": "Hotstar;in.startv.hotstar/3.3.0 (Android/8.1.0)",
             **extra,
         }
+        if playbackUrl:
+            r = Request(playbackUrl)
+            r.add_header("User-Agent", headers.get("User-Agent"))
+            cookie = urlopen(r).headers.get("Set-Cookie").split(";")
+            if len(cookie) > 0:
+                headers["Cookie"] = cookie[0]
+        return headers
 
     @staticmethod
-    def _getAuth(includeST=False):
+    def _getAuth(includeST=False, persona=False):
         _AKAMAI_ENCRYPTION_KEY = b'\x05\xfc\x1a\x01\xca\xc9\x4b\xc4\x12\xfc\x53\x12\x07\x75\xf9\xee'
+        if persona:
+            _AKAMAI_ENCRYPTION_KEY = b"\xa0\xaa\x8b\xcf\x9d\xd5\x8e\xc6\xe3\xb5\x7d\x9b\x4e\x5a\x00\x80\xb1\x45\x0d\xf7\x43\x6c\xfa\x22\xdd\x5c\xff\xdf\xea\x8e\x12\x52"
         st = int(time.time())
         exp = st + 6000
         auth = 'st=%d~exp=%d~acl=/*' % (st,
@@ -270,7 +291,8 @@ class HotstarAPI:
                     del config["ladder"]
                 if config not in options:
                     options.append(config)
-        options.sort(key=lambda x: str(quality.get(x.get("resolution", "sd")) or ""))
+        options.sort(key=lambda x: str(
+            quality.get(x.get("resolution", "sd")) or ""))
         if len(options) > 0:
             if Settings.get_string("playback_select") == "Ask" or ask:
                 index = Dialog().select("Playback Quality", list(map(lambda x: "Video: {0} - {1} - {2} - {3} | Audio: {4} - {5} | {6}".format(x.get("resolution", "").upper(), x.get(
