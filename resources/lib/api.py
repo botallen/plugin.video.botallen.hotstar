@@ -240,9 +240,9 @@ class HotstarAPI:
         if playbackUrl:
             r = Request(playbackUrl)
             r.add_header("User-Agent", headers.get("User-Agent"))
-            cookie = urlopen(r).headers.get("Set-Cookie").split(";")
-            if len(cookie) > 0:
-                headers["Cookie"] = cookie[0]
+            cookie = urlopen(r).headers.get("Set-Cookie")
+            if cookie is not None and len(cookie) > 0:
+                headers["Cookie"] = cookie.split(";")[0]
         return headers
 
     @staticmethod
