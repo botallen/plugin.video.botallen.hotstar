@@ -99,6 +99,8 @@ class Builder:
             subtitleUrl = re.sub(
                 "(.*)(master[\w+\_\-]*?\.[\w+]{3})([\w\/\?=~\*\-]*)", "\g<1>subtitle/lang_en/subtitle.vtt\g<3>", playbackUrl) + "|User-Agent=Hotstar%3Bin.startv.hotstar%2F3.3.0+%28Android%2F8.1.0%29"
             Script.log(subtitleUrl, lvl=Script.DEBUG)
+            if licenceUrl and "/hms/wv/" in licenceUrl:
+                drm = "com.widevine.alpha"
             return Listitem().from_dict(**{
                 "label": label,
                 "callback": playbackUrl,
