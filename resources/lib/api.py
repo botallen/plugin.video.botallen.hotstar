@@ -2,6 +2,7 @@
 from __future__ import unicode_literals
 
 import urlquick
+import xbmc
 from xbmc import executebuiltin
 from xbmcgui import Dialog
 from functools import reduce
@@ -18,6 +19,7 @@ import hmac
 import json
 import re
 from uuid import uuid4
+import web_pdb
 from base64 import b64decode
 
 
@@ -88,16 +90,25 @@ class HotstarAPI:
         return [], None, None
 
     def getPlay(self, contentId, subtag, drm=False, lang=None, partner=None, ask=False):
-        url = url_constructor("/play/v1/playback/%scontent/%s" %
-                              ('partner/' if partner is not None else '', contentId))
-        encryption = "widevine" if drm else "plain"
+        # 'partner/' if partner is not None else '',
+        url = url_constructor("/play/v4/playback/content/%s" % (contentId))
+        encryption = "widevine"     # if drm else "plain"
+
+        """
         if partner:
             resp = self.post(url, headers=self._getPlayHeaders(extra={"X-HS-Platform": "android"}), params=self._getPlayParams(
                 subtag, encryption), max_age=-1, json={"user_id": "", "partner_data": "x", "data": {"third_party_bundle": partner}})
         else:
             resp = self.get(url, headers=self._getPlayHeaders(
             ), params=self._getPlayParams(subtag, encryption), max_age=-1)
-        playBackSets = deep_get(resp, "data.playBackSets")
+        """
+        data = '{"os_name":"Windows","os_version":"10","app_name":"web","app_version":"7.37.0","platform":"Chrome","platform_version":"105.0.0.0","client_capabilities":{"ads":["non_ssai"],"audio_channel":["stereo"],"dvr":["short"],"package":["dash","hls"],"dynamic_range":["sdr"],"video_codec":["h264"],"encryption":["widevine"],"ladder":["tv"],"container":["fmp4"],"resolution":["hd"]},"drm_parameters":{"widevine_security_level":["SW_SECURE_DECODE","SW_SECURE_CRYPTO"],"hdcp_version":["HDCP_NO_DIGITAL_OUTPUT"]},"resolution":"auto"}'
+        
+        resp = self.post(url, headers=self._getPlayHeaders(includeST=True), params=self._getPlayParams(
+            subtag, encryption), max_age=-1, data=data)
+        
+        playBackSets = deep_get(resp, "data.playback_sets")
+        # web_pdb.set_trace()
         if playBackSets is None:
             return None, None, None
         playbackUrl, licenceUrl, playbackProto = HotstarAPI._findPlayback(
@@ -118,13 +129,52 @@ class HotstarAPI:
         return "com.widevine.alpha" if item.get("encrypted") else False, item.get("isSubTagged") and "subs-tag:%s|" % item.get("features")[0].get("subType"), item.get("title")
 
     def doLogin(self):
+
+        # mobile = Dialog().numeric(0, "Enter 10 Digit mobile number")
+
+        mobile = "7045087321"
+
         url = url_constructor(
-            "/in/aadhar/v2/firetv/in/users/logincode/")
-        resp = self.post(url, headers={"Content-Length": "0"})
+            "/um/v3/users/084f1867f85e4f109087e876ab8eb2ae/register?register-by=phone_otp")
+
+        data = {
+            "phone_number": mobile,
+            "country_prefix": "91",
+            "device_meta": {"device_name": "Chrome Browser on Windows"}
+        }
+        
+        data = json.dumps(data)
+        
+        resp = self.put(url, headers=self._getPlayHeaders(
+            includeST=True, includeUM=True, extra={"x-hs-device-id": str(uuid4())}), data=data)
+        
+        if deep_get(resp, "message") == 'User verification initiated':
+            OTP = Dialog().numeric(0, "Enter 4 Digit OTP")
+            url = url_constructor(
+                "/um/v3/users/login?login-by=phone_otp")
+
+            data = {
+                "phone_number": mobile,
+                "verification_code":OTP,
+                "device_meta": {"device_name": "Chrome Browser on Windows"}
+            }
+            data = json.dumps(data)
+            resp = self.put(url, headers=self._getPlayHeaders(
+                includeST=True, includeUM=True, extra={"x-hs-device-id": str(uuid4())}), data=data)
+            token = deep_get(resp, "user_identity")
+            if token:
+                with PersistentDict("userdata.pickle") as db:
+                    db["token"] = token
+                    db["deviceId"] = str(uuid4())
+                    db["udata"] = json.loads(json.loads(
+                        b64decode(token.split(".")[1] + "========")).get("sub"))
+                    db.flush()
+                    Script.notify("Login Success", "You are logged in")
+        """
         code = deep_get(resp, "description.code")
         yield (code, 1)
         for i in range(2, 101):
-            resp = self.get(url+code, max_age=-1)
+            resp = self.get(url + code, max_age=-1)
             Script.log(resp, lvl=Script.INFO)
             token = deep_get(resp, "description.userIdentity")
             if token:
@@ -132,33 +182,45 @@ class HotstarAPI:
                     db["token"] = token
                     db["deviceId"] = str(uuid4())
                     db["udata"] = json.loads(json.loads(
-                        b64decode(token.split(".")[1]+"========")).get("sub"))
+                        b64decode(token.split(".")[1] + "========")).get("sub"))
                     if db.get("isGuest"):
                         del db["isGuest"]
                     db.flush()
                 yield code, 100
                 break
             yield code, i
+        """
 
     def doLogout(self):
         with PersistentDict("userdata.pickle") as db:
             db.clear()
             db.flush()
         Script.notify("Logout Success", "You are logged out")
+        return
 
     def get(self, url, **kwargs):
         try:
             response = self.session.get(url, **kwargs)
+            # web_pdb.set_trace()
             return response.json()
         except Exception as e:
             return self._handleError(e, url, "get", **kwargs)
 
     def post(self, url, **kwargs):
         try:
+            # web_pdb.set_trace()
             response = self.session.post(url, **kwargs)
             return response.json()
         except Exception as e:
             return self._handleError(e, url, "post", **kwargs)
+
+    def put(self, url, **kwargs):
+        try:
+            # web_pdb.set_trace()
+            response = self.session.put(url, **kwargs)
+            return response.json()
+        except Exception as e:
+            return self._handleError(e, url, "put", **kwargs)
 
     def _handleError(self, e, url, _rtype, **kwargs):
         if e.__class__.__name__ == "ValueError":
@@ -170,9 +232,9 @@ class HotstarAPI:
                 with PersistentDict("userdata.pickle") as db:
                     if db.get("isGuest"):
                         Script.notify(
-                            "Login Error", "Please login to watch this content")
-                        executebuiltin(
-                            "RunPlugin(plugin://plugin.video.botallen.hotstar/resources/lib/main/login/)")
+                            "Subscription Error", "Please subscribe to watch this content")
+                        # executebuiltin(
+                        #    "RunPlugin(plugin://plugin.video.botallen.hotstar/resources/lib/main/login/)")
                     else:
                         Script.notify(
                             "Subscription Error", "You don't have valid subscription to watch this content", display_time=2000)
@@ -210,6 +272,7 @@ class HotstarAPI:
         try:
             with PersistentDict("userdata.pickle") as db:
                 oldToken = db.get("token")
+                # web_pdb.set_trace()
                 if oldToken:
                     resp = self.session.get(url_constructor("/in/aadhar/v2/firetv/in/users/refresh-token"),
                                             headers={"userIdentity": oldToken, "deviceId": db.get("deviceId", str(uuid4()))}, raise_for_status=False, max_age=-1).json()
@@ -224,36 +287,40 @@ class HotstarAPI:
             return e
 
     @staticmethod
-    def _getPlayHeaders(includeST=False, playbackUrl=None, extra={}):
+    def _getPlayHeaders(includeST=False, includeUM=False, playbackUrl=None, extra={}):
         with PersistentDict("userdata.pickle") as db:
             token = db.get("token")
-        auth = HotstarAPI._getAuth(includeST)
+        auth = HotstarAPI._getAuth(includeST, False, includeUM)
         headers = {
             "hotstarauth": auth,
-            "X-Country-Code": "in",
-            "X-HS-AppVersion": "3.3.0",
-            "X-HS-Platform": "firetv",
-            "X-HS-UserToken": token,
-            "User-Agent": "Hotstar;in.startv.hotstar/3.3.0 (Android/8.1.0)",
+            "x-hs-platform": "web",
+            "x-hs-appversion": "7.37.0",
+            "content-type": "application/json",
+            "x-country-code": "in",
+            "x-platform-code": "PCTV",
+            "x-hs-usertoken": token,
+            "x-hs-request-id": str(uuid4()),
+            "user-agent": "Hotstar;in.startv.hotstar/3.3.0 (Android/8.1.0)",
             **extra,
         }
         if playbackUrl:
             r = Request(playbackUrl)
-            r.add_header("User-Agent", headers.get("User-Agent"))
+            r.add_header("user-agent", headers.get("user-agent"))
             cookie = urlopen(r).headers.get("Set-Cookie", "").split(";")[0]
             if cookie:
                 headers["Cookie"] = cookie
         return headers
 
     @staticmethod
-    def _getAuth(includeST=False, persona=False):
+    def _getAuth(includeST=False, persona=False, includeUM=False):
         _AKAMAI_ENCRYPTION_KEY = b'\x05\xfc\x1a\x01\xca\xc9\x4b\xc4\x12\xfc\x53\x12\x07\x75\xf9\xee'
         if persona:
             _AKAMAI_ENCRYPTION_KEY = b"\xa0\xaa\x8b\xcf\x9d\xd5\x8e\xc6\xe3\xb5\x7d\x9b\x4e\x5a\x00\x80\xb1\x45\x0d\xf7\x43\x6c\xfa\x22\xdd\x5c\xff\xdf\xea\x8e\x12\x52"
         st = int(time.time())
+        
+        um = '/um/v3' if includeUM else ''
         exp = st + 6000
-        auth = 'st=%d~exp=%d~acl=/*' % (st,
-                                        exp) if includeST else 'exp=%d~acl=/*' % exp
+        auth = 'st=%d~exp=%d~acl=%s/*' % (st, exp, um) if includeST else 'exp=%d~acl=/*' % exp
         auth += '~hmac=' + hmac.new(_AKAMAI_ENCRYPTION_KEY,
                                     auth.encode(), hashlib.sha256).hexdigest()
         return auth
@@ -263,10 +330,8 @@ class HotstarAPI:
         with PersistentDict("userdata.pickle") as db:
             deviceId = db.get("deviceId", str(uuid4()))
         return {
-            "os-name": "firetv",
-            "desired-config": "audio_channel:stereo|encryption:%s|ladder:tv|package:dash|%svideo_codec:h264" % (encryption, subTag or ""),
-            "device-id": deviceId,
-            "os-version": "8.1.0"
+            "desired-config": "audio_channel:stereo|container:fmp4|dynamic_range:sdr|encryption:%s|ladder:tv|package:dash|resolution:fhd|%svideo_codec:h264" % (encryption, subTag or ""),
+            "device-id": deviceId
         }
 
     @staticmethod
@@ -277,14 +342,14 @@ class HotstarAPI:
         quality = {"4k": 0, "hd": 1, "sd": 2}
         for each in playBackSets:
             config = {k: v for d in map(lambda x: dict([x.split(":")]), each.get(
-                "tagsCombination", "a:b").split(";")) for k, v in d.items()}
+                "tags_combination", "a:b").split(";")) for k, v in d.items()}
             Script.log(
                 f"Checking combination {config} with language {lang}", lvl=Script.DEBUG)
             if config.get("encryption", "") in ["plain", "widevine"] and config.get("package", "") in ["hls", "dash"]:
                 if lang and config.get("language") and config.get("language", "") != lang:
                     continue
-                config["playback"] = (each.get("playbackUrl"), each.get(
-                    "licenceUrl"), "mpd" if config.get("package") == "dash" else "hls")
+                config["playback"] = (each.get("playback_url"), each.get(
+                    "licence_url"), "mpd" if config.get("package") == "dash" else "hls")
                 if selected is None:
                     selected = config["playback"]
                 if config.get("ladder"):

@@ -6,13 +6,14 @@ from codequick import Route, run, Script, Resolver
 import resources.lib.utils as U
 from xbmcgui import DialogProgress
 from xbmc import executebuiltin
+import xbmc
 from xbmcplugin import SORT_METHOD_EPISODE, SORT_METHOD_DATE
 import time
 import urlquick
 from .api import HotstarAPI
 from .builder import Builder
 from .contants import BASE_HEADERS, CONTENT_TYPE
-
+import web_pdb
 
 @Route.register
 def root(plugin):
@@ -69,16 +70,7 @@ def play_ext(plugin, contentId, partner=None):
 
 @Script.register
 def login(plugin):
-    msg = "1. Go to [B]https://tv.hotstar.com[/B]\n2. Login with your hotstar account[CR]3. Enter the 4 digit code : "
-    pdialog = DialogProgress()
-    pdialog.create("Login", msg+"Loading...")
-    for code, i in api.doLogin():
-        if pdialog.iscanceled() or i == 100:
-            break
-        else:
-            time.sleep(1)
-        pdialog.update(i, msg+"[B][UPPERCASE]%s[/UPPERCASE][/B]" % code)
-    pdialog.close()
+    api.doLogin()
 
 
 @Script.register

@@ -11,7 +11,7 @@ IMG_FANART_H_URL = IMG_BASE + "/f_auto,w_1920,h_1080/%s.jpg"
 IMG_POSTER_V_URL = IMG_BASE + "/f_auto,t_web_vl_3x/%s.jpg"
 IMG_THUMB_H_URL = IMG_BASE + "/f_auto,t_web_hs_3x/%s.jpg"
 
-BASE_HEADERS = {"x-country-code": "in", "x-platform-code": "ANDROID"}
+BASE_HEADERS = {"x-country-code": "IN", "x-platform-code": "ANDROID"}
 CONTENT_TYPE = {"MOVIE": "movies", "SHOW": "tvshows",
                 "SEASON": "tvshows", "EPISODE": "episodes"}
 MEDIA_TYPE = {"MOVIE": "movie", "SHOW": "tvshow",

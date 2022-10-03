@@ -24,16 +24,18 @@ def isLoggedIn(func):
             if db.get("token"):
                 return func(*args, **kwargs)
             elif db.get("isGuest") is None:
-                db["token"] = guestToken()
+                token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ1bV9hY2Nlc3MiLCJleHAiOjE2NjQ4NjI3MzIsImlhdCI6MTY2NDI1NzkzMiwiaXNzIjoiVFMiLCJqdGkiOiIxMzc5MTIzN2QxNTg0YjJiOGE5ZGNjMTFiMzg4YTcyZCIsInN1YiI6IntcImhJZFwiOlwiMDg0ZjE4NjdmODVlNGYxMDkwODdlODc2YWI4ZWIyYWVcIixcInBJZFwiOlwiZGIxYzFlN2Q2NmFhNDg1ZDg4MzdiOGRhNzAzZWUwOWFcIixcIm5hbWVcIjpcIkd1ZXN0IFVzZXJcIixcImlwXCI6XCIxMDMuMTcyLjg2LjExNFwiLFwiY291bnRyeUNvZGVcIjpcImluXCIsXCJjdXN0b21lclR5cGVcIjpcIm51XCIsXCJ0eXBlXCI6XCJndWVzdFwiLFwiaXNFbWFpbFZlcmlmaWVkXCI6ZmFsc2UsXCJpc1Bob25lVmVyaWZpZWRcIjpmYWxzZSxcImRldmljZUlkXCI6XCI5NTE5OWEwYi1jODVhLTQwNTUtYmE4MS1hZDcyNGUwNTk5MTNcIixcInByb2ZpbGVcIjpcIkFEVUxUXCIsXCJ2ZXJzaW9uXCI6XCJ2MlwiLFwic3Vic2NyaXB0aW9uc1wiOntcImluXCI6e319LFwiaXNzdWVkQXRcIjoxNjY0MjU3OTMyMDU1fSIsInZlcnNpb24iOiIxXzAifQ.MfG9sAeXaBRkQgqz_TpQDAEt5jvIm6mlrzuA3fgvngk'
+                db["token"] = token               
+                # db["token"] = guestToken()
                 db["isGuest"] = True
                 db.flush()
                 return func(*args, **kwargs)
             else:
                 # login require
                 Script.notify(
-                    "Login Error", "Please login to watch this content")
-                executebuiltin(
-                    "RunPlugin(plugin://plugin.video.botallen.hotstar/resources/lib/main/login/)")
+                    "Login Error", "You need valid subscription to watch this content")
+                # executebuiltin(
+                #    "RunPlugin(plugin://plugin.video.botallen.hotstar/resources/lib/main/login/)")
                 return False
     return login_wrapper
 
