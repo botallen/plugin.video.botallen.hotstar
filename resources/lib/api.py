@@ -130,9 +130,7 @@ class HotstarAPI:
 
     def doLogin(self):
 
-        # mobile = Dialog().numeric(0, "Enter 10 Digit mobile number")
-
-        mobile = "7045087321"
+        mobile = Dialog().numeric(0, "Enter 10 Digit mobile number")
 
         url = url_constructor(
             "/um/v3/users/084f1867f85e4f109087e876ab8eb2ae/register?register-by=phone_otp")
