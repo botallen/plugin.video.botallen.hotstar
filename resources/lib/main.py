@@ -13,7 +13,6 @@ import urlquick
 from .api import HotstarAPI
 from .builder import Builder
 from .contants import BASE_HEADERS, CONTENT_TYPE
-import web_pdb
 
 @Route.register
 def root(plugin):

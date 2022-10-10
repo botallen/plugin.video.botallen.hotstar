@@ -5,7 +5,11 @@ from codequick.storage import PersistentDict
 from .contants import url_constructor
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 import urlquick
+import json
 from uuid import uuid4
+import time
+import hashlib
+import hmac
 
 from xbmc import executebuiltin
 
@@ -24,9 +28,7 @@ def isLoggedIn(func):
             if db.get("token"):
                 return func(*args, **kwargs)
             elif db.get("isGuest") is None:
-                token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ1bV9hY2Nlc3MiLCJleHAiOjE2NjQ4NjI3MzIsImlhdCI6MTY2NDI1NzkzMiwiaXNzIjoiVFMiLCJqdGkiOiIxMzc5MTIzN2QxNTg0YjJiOGE5ZGNjMTFiMzg4YTcyZCIsInN1YiI6IntcImhJZFwiOlwiMDg0ZjE4NjdmODVlNGYxMDkwODdlODc2YWI4ZWIyYWVcIixcInBJZFwiOlwiZGIxYzFlN2Q2NmFhNDg1ZDg4MzdiOGRhNzAzZWUwOWFcIixcIm5hbWVcIjpcIkd1ZXN0IFVzZXJcIixcImlwXCI6XCIxMDMuMTcyLjg2LjExNFwiLFwiY291bnRyeUNvZGVcIjpcImluXCIsXCJjdXN0b21lclR5cGVcIjpcIm51XCIsXCJ0eXBlXCI6XCJndWVzdFwiLFwiaXNFbWFpbFZlcmlmaWVkXCI6ZmFsc2UsXCJpc1Bob25lVmVyaWZpZWRcIjpmYWxzZSxcImRldmljZUlkXCI6XCI5NTE5OWEwYi1jODVhLTQwNTUtYmE4MS1hZDcyNGUwNTk5MTNcIixcInByb2ZpbGVcIjpcIkFEVUxUXCIsXCJ2ZXJzaW9uXCI6XCJ2MlwiLFwic3Vic2NyaXB0aW9uc1wiOntcImluXCI6e319LFwiaXNzdWVkQXRcIjoxNjY0MjU3OTMyMDU1fSIsInZlcnNpb24iOiIxXzAifQ.MfG9sAeXaBRkQgqz_TpQDAEt5jvIm6mlrzuA3fgvngk'
-                db["token"] = token               
-                # db["token"] = guestToken()
+                db["token"] = guestToken()
                 db["isGuest"] = True
                 db.flush()
                 return func(*args, **kwargs)
@@ -38,14 +40,34 @@ def isLoggedIn(func):
                 #    "RunPlugin(plugin://plugin.video.botallen.hotstar/resources/lib/main/login/)")
                 return False
     return login_wrapper
-
-
+    
+    
+def getAuth(includeST=False, persona=False, includeUM=False):
+    _AKAMAI_ENCRYPTION_KEY = b'\x05\xfc\x1a\x01\xca\xc9\x4b\xc4\x12\xfc\x53\x12\x07\x75\xf9\xee'
+    if persona:
+        _AKAMAI_ENCRYPTION_KEY = b"\xa0\xaa\x8b\xcf\x9d\xd5\x8e\xc6\xe3\xb5\x7d\x9b\x4e\x5a\x00\x80\xb1\x45\x0d\xf7\x43\x6c\xfa\x22\xdd\x5c\xff\xdf\xea\x8e\x12\x52"
+    st = int(time.time())
+    
+    um = '/um/v3' if includeUM else ''
+    exp = st + 6000
+    auth = 'st=%d~exp=%d~acl=%s/*' % (st, exp, um) if includeST else 'exp=%d~acl=/*' % exp
+    auth += '~hmac=' + hmac.new(_AKAMAI_ENCRYPTION_KEY,
+                                auth.encode(), hashlib.sha256).hexdigest()
+    return auth
+    
+    
 def guestToken():
-    resp = urlquick.post(url_constructor("/in/aadhar/v2/firetv/in/user/guest-signup"), json={
-        "idType": "device",
-        "id": str(uuid4()),
-    }).json()
-    return deep_get(resp, "description.userIdentity")
+    hdr = {
+                'hotstarauth': getAuth(includeST=True, persona=False, includeUM=True),
+                'X-HS-Platform': 'PCTV',
+                'X-Request-Id': str(uuid4()),
+                'Content-Type': 'application/json',
+            }
+
+    data = json.dumps({"device_ids": [{"id": str(uuid4()), "type": "device_id"}]}).encode('utf-8')
+    resp = urlquick.post(url_constructor("/um/v3/users"), data=data, headers=hdr).json()
+
+    return deep_get(resp, "user_identity")
 
 
 def updateQueryParams(url, params):

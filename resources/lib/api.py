@@ -7,7 +7,7 @@ from xbmc import executebuiltin
 from xbmcgui import Dialog
 from functools import reduce
 from resources.lib.contants import API_BASE_URL, BASE_HEADERS, url_constructor
-from resources.lib.utils import deep_get, updateQueryParams, qualityFilter
+from resources.lib.utils import deep_get, updateQueryParams, qualityFilter, getAuth
 from codequick import Script
 from codequick.script import Settings
 from codequick.storage import PersistentDict
@@ -51,7 +51,7 @@ class HotstarAPI:
             with PersistentDict("userdata.pickle") as db:
                 pid = db.get("udata", {}).get("pId")
             results = self.get(url.format(pid=pid), headers={
-                               "hotstarauth": self._getAuth(includeST=True, persona=True)})
+                               "hotstarauth": getAuth(includeST=True, persona=True)})
             # ids = ",".join(map(lambda x: x.get("item_id"),
             #                deep_get(results, "data.items")))
             # url = url_constructor("/o/v1/multi/get/content?ids=" + ids)
@@ -102,13 +102,14 @@ class HotstarAPI:
             resp = self.get(url, headers=self._getPlayHeaders(
             ), params=self._getPlayParams(subtag, encryption), max_age=-1)
         """
-        data = '{"os_name":"Windows","os_version":"10","app_name":"web","app_version":"7.37.0","platform":"Chrome","platform_version":"105.0.0.0","client_capabilities":{"ads":["non_ssai"],"audio_channel":["stereo"],"dvr":["short"],"package":["dash","hls"],"dynamic_range":["sdr"],"video_codec":["h264"],"encryption":["widevine"],"ladder":["tv"],"container":["fmp4"],"resolution":["hd"]},"drm_parameters":{"widevine_security_level":["SW_SECURE_DECODE","SW_SECURE_CRYPTO"],"hdcp_version":["HDCP_NO_DIGITAL_OUTPUT"]},"resolution":"auto"}'
+        #web_pdb.set_trace()
+        data = '{"os_name":"Windows","os_version":"10","app_name":"web","app_version":"7.41.0","platform":"Chrome","platform_version":"106.0.0.0","client_capabilities":{"ads":["non_ssai"],"audio_channel":["stereo"],"dvr":["short"],"package":["dash","hls"],"dynamic_range":["sdr"],"video_codec":["h264"],"encryption":["widevine"],"ladder":["tv"],"container":["fmp4"],"resolution":["hd"]},"drm_parameters":{"widevine_security_level":["SW_SECURE_DECODE","SW_SECURE_CRYPTO"],"hdcp_version":["HDCP_NO_DIGITAL_OUTPUT"]},"resolution":"auto"}'
         
         resp = self.post(url, headers=self._getPlayHeaders(includeST=True), params=self._getPlayParams(
             subtag, encryption), max_age=-1, data=data)
         
         playBackSets = deep_get(resp, "data.playback_sets")
-        # web_pdb.set_trace()
+        
         if playBackSets is None:
             return None, None, None
         playbackUrl, licenceUrl, playbackProto = HotstarAPI._findPlayback(
@@ -199,14 +200,12 @@ class HotstarAPI:
     def get(self, url, **kwargs):
         try:
             response = self.session.get(url, **kwargs)
-            # web_pdb.set_trace()
             return response.json()
         except Exception as e:
             return self._handleError(e, url, "get", **kwargs)
 
     def post(self, url, **kwargs):
         try:
-            # web_pdb.set_trace()
             response = self.session.post(url, **kwargs)
             return response.json()
         except Exception as e:
@@ -214,7 +213,6 @@ class HotstarAPI:
 
     def put(self, url, **kwargs):
         try:
-            # web_pdb.set_trace()
             response = self.session.put(url, **kwargs)
             return response.json()
         except Exception as e:
@@ -270,7 +268,6 @@ class HotstarAPI:
         try:
             with PersistentDict("userdata.pickle") as db:
                 oldToken = db.get("token")
-                # web_pdb.set_trace()
                 if oldToken:
                     resp = self.session.get(url_constructor("/in/aadhar/v2/firetv/in/users/refresh-token"),
                                             headers={"userIdentity": oldToken, "deviceId": db.get("deviceId", str(uuid4()))}, raise_for_status=False, max_age=-1).json()
@@ -288,7 +285,7 @@ class HotstarAPI:
     def _getPlayHeaders(includeST=False, includeUM=False, playbackUrl=None, extra={}):
         with PersistentDict("userdata.pickle") as db:
             token = db.get("token")
-        auth = HotstarAPI._getAuth(includeST, False, includeUM)
+        auth = getAuth(includeST, False, includeUM)
         headers = {
             "hotstarauth": auth,
             "x-hs-platform": "web",
@@ -308,20 +305,6 @@ class HotstarAPI:
             if cookie:
                 headers["Cookie"] = cookie
         return headers
-
-    @staticmethod
-    def _getAuth(includeST=False, persona=False, includeUM=False):
-        _AKAMAI_ENCRYPTION_KEY = b'\x05\xfc\x1a\x01\xca\xc9\x4b\xc4\x12\xfc\x53\x12\x07\x75\xf9\xee'
-        if persona:
-            _AKAMAI_ENCRYPTION_KEY = b"\xa0\xaa\x8b\xcf\x9d\xd5\x8e\xc6\xe3\xb5\x7d\x9b\x4e\x5a\x00\x80\xb1\x45\x0d\xf7\x43\x6c\xfa\x22\xdd\x5c\xff\xdf\xea\x8e\x12\x52"
-        st = int(time.time())
-        
-        um = '/um/v3' if includeUM else ''
-        exp = st + 6000
-        auth = 'st=%d~exp=%d~acl=%s/*' % (st, exp, um) if includeST else 'exp=%d~acl=/*' % exp
-        auth += '~hmac=' + hmac.new(_AKAMAI_ENCRYPTION_KEY,
-                                    auth.encode(), hashlib.sha256).hexdigest()
-        return auth
 
     @staticmethod
     def _getPlayParams(subTag="", encryption="widevine"):
