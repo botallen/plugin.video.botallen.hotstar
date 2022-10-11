@@ -2,22 +2,16 @@
 from __future__ import unicode_literals
 
 import urlquick
-import xbmc
-from xbmc import executebuiltin
 from xbmcgui import Dialog
 from functools import reduce
-from resources.lib.contants import API_BASE_URL, BASE_HEADERS, url_constructor
-from resources.lib.utils import deep_get, updateQueryParams, qualityFilter, getAuth
+from resources.lib.contants import BASE_HEADERS, url_constructor
+from resources.lib.utils import deep_get, updateQueryParams, qualityFilter, getAuth, guestToken
 from codequick import Script
 from codequick.script import Settings
 from codequick.storage import PersistentDict
-from urllib.parse import quote_plus, urlparse, parse_qsl
+from urllib.parse import quote_plus
 from urllib.request import urlopen, Request
-import time
-import hashlib
-import hmac
 import json
-import re
 from uuid import uuid4
 import web_pdb
 from base64 import b64decode
@@ -76,8 +70,6 @@ class HotstarAPI:
 
             totalResults = deep_get(
                 results, "assets.totalResults") or results.get("totalResults")
-            offset = deep_get(
-                results, "assets.offset") or results.get("offset")
             allResultsPageUrl = None
             if len(items) > 0 and nextPageUrl is not None and ("/season/" in nextPageUrl or items[0].get("assetType") == "EPISODE") and totalResults is not None:
                 allResultsPageUrl = updateQueryParams(nextPageUrl, {"size": str(
@@ -102,14 +94,11 @@ class HotstarAPI:
             resp = self.get(url, headers=self._getPlayHeaders(
             ), params=self._getPlayParams(subtag, encryption), max_age=-1)
         """
-        #web_pdb.set_trace()
+        # web_pdb.set_trace()
         data = '{"os_name":"Windows","os_version":"10","app_name":"web","app_version":"7.41.0","platform":"Chrome","platform_version":"106.0.0.0","client_capabilities":{"ads":["non_ssai"],"audio_channel":["stereo"],"dvr":["short"],"package":["dash","hls"],"dynamic_range":["sdr"],"video_codec":["h264"],"encryption":["widevine"],"ladder":["tv"],"container":["fmp4"],"resolution":["hd"]},"drm_parameters":{"widevine_security_level":["SW_SECURE_DECODE","SW_SECURE_CRYPTO"],"hdcp_version":["HDCP_NO_DIGITAL_OUTPUT"]},"resolution":"auto"}'
-        
         resp = self.post(url, headers=self._getPlayHeaders(includeST=True), params=self._getPlayParams(
             subtag, encryption), max_age=-1, data=data)
-        
         playBackSets = deep_get(resp, "data.playback_sets")
-        
         if playBackSets is None:
             return None, None, None
         playbackUrl, licenceUrl, playbackProto = HotstarAPI._findPlayback(
@@ -140,13 +129,10 @@ class HotstarAPI:
             "phone_number": mobile,
             "country_prefix": "91",
             "device_meta": {"device_name": "Chrome Browser on Windows"}
-        }
-        
+        }        
         data = json.dumps(data)
-        
         resp = self.put(url, headers=self._getPlayHeaders(
             includeST=True, includeUM=True, extra={"x-hs-device-id": str(uuid4())}), data=data)
-        
         if deep_get(resp, "message") == 'User verification initiated':
             OTP = Dialog().numeric(0, "Enter 4 Digit OTP")
             url = url_constructor(
@@ -154,7 +140,7 @@ class HotstarAPI:
 
             data = {
                 "phone_number": mobile,
-                "verification_code":OTP,
+                "verification_code": OTP,
                 "device_meta": {"device_name": "Chrome Browser on Windows"}
             }
             data = json.dumps(data)
@@ -235,7 +221,7 @@ class HotstarAPI:
                         Script.notify(
                             "Subscription Error", "You don't have valid subscription to watch this content", display_time=2000)
             elif e.response.status_code == 401:
-                new_token = self._refreshToken()
+                new_token = guestToken()
                 if new_token:
                     kwargs.get("headers") and kwargs['headers'].update(
                         {"X-HS-UserToken": new_token})
