@@ -27,7 +27,7 @@ class HotstarAPI:
         url = url_constructor("/o/v2/menu")
         resp = self.get(
             url, headers={"x-country-code": "in", "x-platform-code": "PCTV"})
-        return deep_get(resp, "body.results.menuItems")
+        return deep_get(resp["body"]["results"]["menuItems"][0]["subItem"][1], "subItem")
 
     def getPage(self, url):
         results = deep_get(self.get(url), "body.results")

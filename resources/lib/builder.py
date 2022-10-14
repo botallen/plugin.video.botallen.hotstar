@@ -4,9 +4,8 @@ from __future__ import unicode_literals
 from datetime import datetime
 from codequick import Listitem, Script, Resolver, Route
 from codequick.storage import PersistentDict
-from urlquick import MAX_AGE
 import inputstreamhelper
-from .contants import url_constructor, IMG_THUMB_H_URL, IMG_POSTER_V_URL, IMG_FANART_H_URL, MEDIA_TYPE, BASE_HEADERS, TRAY_IDENTIFIERS, PERSONA_BASE_URL, NAME
+from .contants import IMG_THUMB_H_URL, IMG_POSTER_V_URL, IMG_FANART_H_URL, MEDIA_TYPE, BASE_HEADERS, TRAY_IDENTIFIERS, PERSONA_BASE_URL
 from .api import deep_get, HotstarAPI
 from .utils import updateQueryParams
 from urllib.parse import urlencode
@@ -14,7 +13,6 @@ from pickle import dumps
 from binascii import hexlify
 import urlquick
 import re
-import json
 
 
 class Builder:
@@ -24,7 +22,7 @@ class Builder:
             if not each.get("pageUri"):
                 continue
             item = Listitem()
-            item.label = each.get("name")
+            item.label = each.get("name").capitalize()
             item.art['fanart'] = "https://secure-media.hotstar.com/static/firetv/v1/poster_%s_in.jpg" % each.get(
                 "name").lower() if not each.get("name").lower() == "genres" else "https://secure-media.hotstar.com/static/firetv/v1/poster_genre_in.jpg"
             item.set_callback(Route.ref("/resources/lib/main:menu_list") if each.get("pageType") else Route.ref(
