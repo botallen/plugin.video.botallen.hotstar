@@ -11,8 +11,6 @@ import time
 import hashlib
 import hmac
 
-from xbmc import executebuiltin
-
 
 def deep_get(dictionary, keys, default=None):
     return reduce(lambda d, key: d.get(key, default) if isinstance(d, dict) else default, keys.split("."), dictionary)
@@ -40,32 +38,35 @@ def isLoggedIn(func):
                 #    "RunPlugin(plugin://plugin.video.botallen.hotstar/resources/lib/main/login/)")
                 return False
     return login_wrapper
-    
-    
+
+
 def getAuth(includeST=False, persona=False, includeUM=False):
     _AKAMAI_ENCRYPTION_KEY = b'\x05\xfc\x1a\x01\xca\xc9\x4b\xc4\x12\xfc\x53\x12\x07\x75\xf9\xee'
     if persona:
         _AKAMAI_ENCRYPTION_KEY = b"\xa0\xaa\x8b\xcf\x9d\xd5\x8e\xc6\xe3\xb5\x7d\x9b\x4e\x5a\x00\x80\xb1\x45\x0d\xf7\x43\x6c\xfa\x22\xdd\x5c\xff\xdf\xea\x8e\x12\x52"
     st = int(time.time())
-    
+
     um = '/um/v3' if includeUM else ''
     exp = st + 6000
-    auth = 'st=%d~exp=%d~acl=%s/*' % (st, exp, um) if includeST else 'exp=%d~acl=/*' % exp
+    auth = 'st=%d~exp=%d~acl=%s/*' % (st, exp,
+                                      um) if includeST else 'exp=%d~acl=/*' % exp
     auth += '~hmac=' + hmac.new(_AKAMAI_ENCRYPTION_KEY,
                                 auth.encode(), hashlib.sha256).hexdigest()
     return auth
-    
-    
+
+
 def guestToken():
     hdr = {
-                'hotstarauth': getAuth(includeST=True, persona=False, includeUM=True),
-                'X-HS-Platform': 'PCTV',
-                'X-Request-Id': str(uuid4()),
-                'Content-Type': 'application/json',
-            }
+        'hotstarauth': getAuth(includeST=True, persona=False, includeUM=False),
+        'X-HS-Platform': 'PCTV',
+        # 'X-Request-Id': str(uuid4()),
+        'Content-Type': 'application/json',
+    }
 
-    data = json.dumps({"device_ids": [{"id": str(uuid4()), "type": "device_id"}]}).encode('utf-8')
-    resp = urlquick.post(url_constructor("/um/v3/users"), data=data, headers=hdr).json()
+    data = json.dumps(
+        {"device_ids": [{"id": str(uuid4()), "type": "device_id"}]})
+    resp = urlquick.post(url_constructor("/um/v3/users"),
+                         data=data, headers=hdr).json()
 
     return deep_get(resp, "user_identity")
 

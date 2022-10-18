@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
 import urlquick
@@ -12,7 +12,6 @@ from urllib.parse import quote_plus
 from urllib.request import urlopen, Request
 import json
 from uuid import uuid4
-import web_pdb
 from base64 import b64decode
 
 
@@ -99,7 +98,7 @@ class HotstarAPI:
         resp = self.post(url, headers=self._getPlayHeaders(includeST=True), params=self._getPlayParams(
             subtag, encryption), max_age=-1, data=data)
         playBackSets = deep_get(resp, "data.playback_sets")
-        # web_pdb.set_trace()
+
         if playBackSets is None:
             return None, None, None
         playbackUrl, licenceUrl, playbackProto = HotstarAPI._findPlayback(

@@ -1,4 +1,4 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from codequick.utils import urljoin_partial
 
 NAME = "plugin.video.botallen.hotstar"
