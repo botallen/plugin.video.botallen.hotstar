@@ -21,7 +21,7 @@ class HotstarAPI:
     def __init__(self):
         self.session = urlquick.Session()
         self.session.headers.update(BASE_HEADERS)
-        
+
     def getMenu(self):
         url = url_constructor("/o/v2/menu")
         resp = self.get(
@@ -98,7 +98,6 @@ class HotstarAPI:
         resp = self.post(url, headers=self._getPlayHeaders(includeST=True), params=self._getPlayParams(
             subtag, encryption), max_age=-1, data=data)
         playBackSets = deep_get(resp, "data.playback_sets")
-
         if playBackSets is None:
             return None, None, None
         playbackUrl, licenceUrl, playbackProto = HotstarAPI._findPlayback(
@@ -117,17 +116,18 @@ class HotstarAPI:
         if item.get("clipType") == "LIVE":
             item["encrypted"] = True
         return "com.widevine.alpha" if item.get("encrypted") else False, item.get("isSubTagged") and "subs-tag:%s|" % item.get("features")[0].get("subType"), item.get("title")
-    
-    def doLogin(self):
-        token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ1bV9hY2Nlc3MiLCJleHAiOjE2NjYxNTI2NjQsImlhdCI6MTY2NTU0Nzg2NCwiaXNzIjoiVFMiLCJqdGkiOiI0OGQ1MTY1YThlZTU0MDU5YTJmODc1NzU1YzMwMDcwZiIsInN1YiI6IntcImhJZFwiOlwiMDg0ZjE4NjdmODVlNGYxMDkwODdlODc2YWI4ZWIyYWVcIixcInBJZFwiOlwiZGIxYzFlN2Q2NmFhNDg1ZDg4MzdiOGRhNzAzZWUwOWFcIixcIm5hbWVcIjpcIkd1ZXN0IFVzZXJcIixcImlwXCI6XCIxMDMuMTc3LjEzLjE0NlwiLFwiY291bnRyeUNvZGVcIjpcImluXCIsXCJjdXN0b21lclR5cGVcIjpcIm51XCIsXCJ0eXBlXCI6XCJndWVzdFwiLFwiaXNFbWFpbFZlcmlmaWVkXCI6ZmFsc2UsXCJpc1Bob25lVmVyaWZpZWRcIjpmYWxzZSxcImRldmljZUlkXCI6XCI5NTE5OWEwYi1jODVhLTQwNTUtYmE4MS1hZDcyNGUwNTk5MTNcIixcInByb2ZpbGVcIjpcIkFEVUxUXCIsXCJ2ZXJzaW9uXCI6XCJ2MlwiLFwic3Vic2NyaXB0aW9uc1wiOntcImluXCI6e319LFwiaXNzdWVkQXRcIjoxNjY1NTQ3ODY0Mzg3fSIsInZlcnNpb24iOiIxXzAifQ.J0LY0YaWYIz5S_V2cTB0xaIFy0wJnHIotpktQO3Nu70'
-        with PersistentDict("userdata.pickle") as db:
-            db.clear()
-            db["token"] = token
-            db.flush()
 
+    def doLogin(self):
+        with PersistentDict("userdata.pickle") as db:
+            if db.get("token"):
+                self._refreshToken()
+            else:
+                token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ1bV9hY2Nlc3MiLCJleHAiOjE2Njc0NDk0MDAsImlhdCI6MTY2Njg0NDYwMCwiaXNzIjoiVFMiLCJqdGkiOiI0OGQ1MTY1YThlZTU0MDU5YTJmODc1NzU1YzMwMDcwZiIsInN1YiI6IntcImhJZFwiOlwiMDg0ZjE4NjdmODVlNGYxMDkwODdlODc2YWI4ZWIyYWVcIixcInBJZFwiOlwiZGIxYzFlN2Q2NmFhNDg1ZDg4MzdiOGRhNzAzZWUwOWFcIixcIm5hbWVcIjpcIkd1ZXN0IFVzZXJcIixcImlwXCI6XCIxMDMuMTc3LjEzLjE0NlwiLFwiY291bnRyeUNvZGVcIjpcImluXCIsXCJjdXN0b21lclR5cGVcIjpcIm51XCIsXCJ0eXBlXCI6XCJndWVzdFwiLFwiaXNFbWFpbFZlcmlmaWVkXCI6ZmFsc2UsXCJpc1Bob25lVmVyaWZpZWRcIjpmYWxzZSxcImRldmljZUlkXCI6XCI5NTE5OWEwYi1jODVhLTQwNTUtYmE4MS1hZDcyNGUwNTk5MTNcIixcInByb2ZpbGVcIjpcIkFEVUxUXCIsXCJ2ZXJzaW9uXCI6XCJ2MlwiLFwic3Vic2NyaXB0aW9uc1wiOntcImluXCI6e319LFwiaXNzdWVkQXRcIjoxNjY2ODQ0NjAwMjA4fSIsInZlcnNpb24iOiIxXzAifQ.aCCvR7Il0NCsg6181y5NDBCwiTACrYg3wxdAusKfmuY'
+                db.clear()
+                db["token"] = token
+                db.flush()
         mobile = Dialog().numeric(0, "Enter 10 Digit mobile number")
         url = url_constructor("/um/v3/users/084f1867f85e4f109087e876ab8eb2ae/register?register-by=phone_otp")
-        
         data = {
             "phone_number": mobile,
             "country_prefix": "91",
@@ -135,7 +135,6 @@ class HotstarAPI:
         }
         data = json.dumps(data)
         resp = self.put(url, headers=self._getPlayHeaders(includeST=True, includeUM=True, extra={"x-hs-device-id": self.device_id, "x-request-id": self.device_id}), data=data)
-
         if deep_get(resp, "message") == 'User verification initiated':
             OTP = Dialog().numeric(0, "Enter 4 Digit OTP")
             url = url_constructor(
@@ -255,8 +254,6 @@ class HotstarAPI:
     def _getPlayHeaders(includeST=False, includeUM=False, playbackUrl=None, extra={}):
         with PersistentDict("userdata.pickle") as db:
             token = db.get("token")
-            if not token:
-                token = guestToken()
 
         auth = getAuth(includeST, False, includeUM)
         headers = {
