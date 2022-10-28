@@ -3,8 +3,9 @@ from __future__ import unicode_literals
 
 import urlquick
 from xbmcgui import Dialog
+import xbmc
 from resources.lib.contants import BASE_HEADERS, url_constructor
-from resources.lib.utils import deep_get, updateQueryParams, qualityFilter, getAuth, guestToken
+from resources.lib.utils import deep_get, updateQueryParams, qualityFilter, getAuth
 from codequick import Script
 from codequick.script import Settings
 from codequick.storage import PersistentDict
@@ -13,7 +14,6 @@ from urllib.request import urlopen, Request
 import json
 from uuid import uuid4
 from base64 import b64decode
-
 
 class HotstarAPI:
     device_id = str(uuid4())
@@ -25,8 +25,8 @@ class HotstarAPI:
     def getMenu(self):
         url = url_constructor("/o/v2/menu")
         resp = self.get(
-            url, headers={"x-country-code": "in", "x-platform-code": "PCTV"})
-        return deep_get(resp["body"]["results"]["menuItems"][0]["subItem"][1], "subItem")
+            url, headers={"x-country-code": "in", "x-platform-code": "firetv"})
+        return deep_get(resp, "body.results.menuItems")         # deep_get(resp["body"]["results"]["menuItems"][0]["subItem"][1], "subItem")
 
     def getPage(self, url):
         results = deep_get(self.get(url), "body.results")
@@ -183,6 +183,7 @@ class HotstarAPI:
     def put(self, url, **kwargs):
         try:
             response = self.session.put(url, **kwargs)
+            xbmc.log(json.dumps(response.json()))
             return response.json()
         except Exception as e:
             return self._handleError(e, url, "put", **kwargs)
@@ -262,7 +263,7 @@ class HotstarAPI:
             "x-hs-appversion": "7.41.0",
             "content-type": "application/json",
             "x-country-code": "IN",
-            "x-platform-code": "PCTV",
+            "x-platform-code": "firetv",
             "x-hs-usertoken": token,
             "x-hs-request-id": HotstarAPI.device_id,
             "user-agent": "Hotstar;in.startv.hotstar/3.3.0 (Android/8.1.0)",
