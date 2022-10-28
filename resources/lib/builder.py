@@ -22,7 +22,7 @@ class Builder:
             if not each.get("pageUri"):
                 continue
             item = Listitem()
-            item.label = each.get("name").capitalize()
+            item.label = each.get("name")
             item.art['fanart'] = "https://secure-media.hotstar.com/static/firetv/v1/poster_%s_in.jpg" % each.get(
                 "name").lower() if not each.get("name").lower() == "genres" else "https://secure-media.hotstar.com/static/firetv/v1/poster_genre_in.jpg"
             item.set_callback(Route.ref("/resources/lib/main:menu_list") if each.get("pageType") else Route.ref(

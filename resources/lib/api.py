@@ -15,6 +15,7 @@ import json
 from uuid import uuid4
 from base64 import b64decode
 
+
 class HotstarAPI:
     device_id = str(uuid4())
 
