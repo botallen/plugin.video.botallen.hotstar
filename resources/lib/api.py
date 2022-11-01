@@ -27,7 +27,7 @@ class HotstarAPI:
         url = url_constructor("/o/v2/menu")
         resp = self.get(
             url, headers={"x-country-code": "in", "x-platform-code": "firetv"})
-        return deep_get(resp, "body.results.menuItems")         # deep_get(resp["body"]["results"]["menuItems"][0]["subItem"][1], "subItem")
+        return deep_get(resp, "body.results.menuItems")       # deep_get(resp["body"]["results"]["menuItems"][0]["subItem"][1], "subItem")
 
     def getPage(self, url):
         results = deep_get(self.get(url), "body.results")
@@ -94,8 +94,8 @@ class HotstarAPI:
             resp = self.get(url, headers=self._getPlayHeaders(
             ), params=self._getPlayParams(subtag, encryption), max_age=-1)
         """
-
-        data = '{"os_name":"Windows","os_version":"10","app_name":"web","app_version":"7.41.0","platform":"Chrome","platform_version":"106.0.0.0","client_capabilities":{"ads":["non_ssai"],"audio_channel":["stereo"],"dvr":["short"],"package":["dash","hls"],"dynamic_range":["sdr"],"video_codec":["h264"],"encryption":["widevine"],"ladder":["tv"],"container":["fmp4"],"resolution":["hd"]},"drm_parameters":{"widevine_security_level":["SW_SECURE_DECODE","SW_SECURE_CRYPTO"],"hdcp_version":["HDCP_NO_DIGITAL_OUTPUT"]},"resolution":"auto"}'
+        # data = '{"os_name":"Windows","os_version":"10","app_name":"web","app_version":"7.41.0","platform":"Chrome","platform_version":"106.0.0.0","client_capabilities":{"ads":["non_ssai"],"audio_channel":["stereo"],"dvr":["short"],"package":["dash","hls"],"dynamic_range":["sdr"],"video_codec":["h264"],"encryption":["widevine"],"ladder":["tv"],"container":["fmp4","ts"],"resolution":["hd"]},"drm_parameters":{"widevine_security_level":["SW_SECURE_DECODE","SW_SECURE_CRYPTO"],"hdcp_version":["HDCP_NO_DIGITAL_OUTPUT"]},"resolution":"auto"}'
+        data = '{"os_name":"Android","os_version":"7.0","app_name":"android","app_version":"7.41.0","platform":"firetv","platform_version":"7.6.0.0","client_capabilities":{"ads":["non_ssai"],"audio_channel":["stereo"],"dvr":["short"],"package":["dash","hls"],"dynamic_range":["sdr"],"video_codec":["h264"],"encryption":["widevine"],"ladder":["phone"],"container":["fmp4","ts"],"resolution":["fhd","hd"]},"drm_parameters":{"widevine_security_level":["SW_SECURE_DECODE","SW_SECURE_CRYPTO"],"hdcp_version":["HDCP_NO_DIGITAL_OUTPUT"]},"resolution":"auto"}'
         resp = self.post(url, headers=self._getPlayHeaders(includeST=True), params=self._getPlayParams(
             subtag, encryption), max_age=-1, data=data)
         playBackSets = deep_get(resp, "data.playback_sets")
@@ -123,7 +123,7 @@ class HotstarAPI:
             if db.get("token"):
                 self._refreshToken()
             else:
-                token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ1bV9hY2Nlc3MiLCJleHAiOjE2Njc0NDk0MDAsImlhdCI6MTY2Njg0NDYwMCwiaXNzIjoiVFMiLCJqdGkiOiI0OGQ1MTY1YThlZTU0MDU5YTJmODc1NzU1YzMwMDcwZiIsInN1YiI6IntcImhJZFwiOlwiMDg0ZjE4NjdmODVlNGYxMDkwODdlODc2YWI4ZWIyYWVcIixcInBJZFwiOlwiZGIxYzFlN2Q2NmFhNDg1ZDg4MzdiOGRhNzAzZWUwOWFcIixcIm5hbWVcIjpcIkd1ZXN0IFVzZXJcIixcImlwXCI6XCIxMDMuMTc3LjEzLjE0NlwiLFwiY291bnRyeUNvZGVcIjpcImluXCIsXCJjdXN0b21lclR5cGVcIjpcIm51XCIsXCJ0eXBlXCI6XCJndWVzdFwiLFwiaXNFbWFpbFZlcmlmaWVkXCI6ZmFsc2UsXCJpc1Bob25lVmVyaWZpZWRcIjpmYWxzZSxcImRldmljZUlkXCI6XCI5NTE5OWEwYi1jODVhLTQwNTUtYmE4MS1hZDcyNGUwNTk5MTNcIixcInByb2ZpbGVcIjpcIkFEVUxUXCIsXCJ2ZXJzaW9uXCI6XCJ2MlwiLFwic3Vic2NyaXB0aW9uc1wiOntcImluXCI6e319LFwiaXNzdWVkQXRcIjoxNjY2ODQ0NjAwMjA4fSIsInZlcnNpb24iOiIxXzAifQ.aCCvR7Il0NCsg6181y5NDBCwiTACrYg3wxdAusKfmuY'
+                token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ1bV9hY2Nlc3MiLCJleHAiOjE2Njc4OTA1MzYsImlhdCI6MTY2NzI4NTczNiwiaXNzIjoiVFMiLCJqdGkiOiJlMGEzODZjOThhY2Q0Mzk1ODUzNDFmZDUyYjcwZjY1YiIsInN1YiI6IntcImhJZFwiOlwiMDg0ZjE4NjdmODVlNGYxMDkwODdlODc2YWI4ZWIyYWVcIixcInBJZFwiOlwiZGIxYzFlN2Q2NmFhNDg1ZDg4MzdiOGRhNzAzZWUwOWFcIixcIm5hbWVcIjpcIkd1ZXN0IFVzZXJcIixcImlwXCI6XCIxMDMuMTc3LjEzLjE0NlwiLFwiY291bnRyeUNvZGVcIjpcImluXCIsXCJjdXN0b21lclR5cGVcIjpcIm51XCIsXCJ0eXBlXCI6XCJndWVzdFwiLFwiaXNFbWFpbFZlcmlmaWVkXCI6ZmFsc2UsXCJpc1Bob25lVmVyaWZpZWRcIjpmYWxzZSxcImRldmljZUlkXCI6XCI5NTE5OWEwYi1jODVhLTQwNTUtYmE4MS1hZDcyNGUwNTk5MTNcIixcInByb2ZpbGVcIjpcIkFEVUxUXCIsXCJ2ZXJzaW9uXCI6XCJ2MlwiLFwic3Vic2NyaXB0aW9uc1wiOntcImluXCI6e319LFwiaXNzdWVkQXRcIjoxNjY3Mjg1NzM2ODIzfSIsInZlcnNpb24iOiIxXzAifQ.gziXx1ODiIAL1iKSb0Cxsy4PmCnHSPGWtfa5uLxmEoQ'
                 db.clear()
                 db["token"] = token
                 db.flush()
@@ -148,7 +148,7 @@ class HotstarAPI:
             }
             data = json.dumps(data)
             resp = self.put(url, headers=self._getPlayHeaders(
-                includeST=True, includeUM=False, extra={"x-hs-device-id": self.device_id}), data=data)
+                includeST=True, includeUM=True, extra={"x-hs-device-id": self.device_id}), data=data)
             token = deep_get(resp, "user_identity")
             if token:
                 with PersistentDict("userdata.pickle") as db:
@@ -184,7 +184,7 @@ class HotstarAPI:
     def put(self, url, **kwargs):
         try:
             response = self.session.put(url, **kwargs)
-            xbmc.log(json.dumps(response.json()))
+            # xbmc.log(json.dumps(response.json()))
             return response.json()
         except Exception as e:
             return self._handleError(e, url, "put", **kwargs)
@@ -260,14 +260,15 @@ class HotstarAPI:
         auth = getAuth(includeST, False, includeUM)
         headers = {
             "hotstarauth": auth,
-            "x-hs-platform": "web",
+            "x-hs-platform": "firetv",
             "x-hs-appversion": "7.41.0",
             "content-type": "application/json",
-            "x-country-code": "IN",
-            "x-platform-code": "firetv",
+            "x-country-code": "in",
+            "x-platform-code": "PCTV",
             "x-hs-usertoken": token,
             "x-hs-request-id": HotstarAPI.device_id,
             "user-agent": "Hotstar;in.startv.hotstar/3.3.0 (Android/8.1.0)",
+            # Mozilla/5.0 (Linux; Android 7.0; Redmi Note 4) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Mobile Safari/537.36
             **extra,
         }
         if playbackUrl:
@@ -283,7 +284,7 @@ class HotstarAPI:
         with PersistentDict("userdata.pickle") as db:
             deviceId = db.get("deviceId", HotstarAPI.device_id)
         return {
-            "desired-config": "audio_channel:stereo|container:fmp4|dynamic_range:sdr|encryption:%s|ladder:tv|package:dash|resolution:fhd|%svideo_codec:h264" % (encryption, subTag or ""),
+            "desired-config": "audio_channel:stereo|container:fmp4|dynamic_range:sdr|encryption:%s|ladder:phone|package:dash|resolution:fhd|%svideo_codec:h264" % (encryption, subTag or ""),
             "device-id": deviceId
         }
 
