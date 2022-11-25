@@ -5,9 +5,11 @@ from codequick.storage import PersistentDict
 from .contants import url_constructor
 from urllib.parse import urlparse, parse_qsl, urlencode, urlunparse
 import urlquick
+import json
 from uuid import uuid4
-
-from xbmc import executebuiltin
+import time
+import hashlib
+import hmac
 
 
 def deep_get(dictionary, keys, default=None):
@@ -31,19 +33,51 @@ def isLoggedIn(func):
             else:
                 # login require
                 Script.notify(
-                    "Login Error", "Please login to watch this content")
-                executebuiltin(
-                    "RunPlugin(plugin://plugin.video.botallen.hotstar/resources/lib/main/login/)")
+                    "Login Error", "You need valid subscription to watch this content")
+                # executebuiltin(
+                #    "RunPlugin(plugin://plugin.video.botallen.hotstar/resources/lib/main/login/)")
                 return False
     return login_wrapper
 
 
+def getAuth(includeST=False, persona=False, includeUM=False):
+    _AKAMAI_ENCRYPTION_KEY = b'\x05\xfc\x1a\x01\xca\xc9\x4b\xc4\x12\xfc\x53\x12\x07\x75\xf9\xee'
+    if persona:
+        _AKAMAI_ENCRYPTION_KEY = b"\xa0\xaa\x8b\xcf\x9d\xd5\x8e\xc6\xe3\xb5\x7d\x9b\x4e\x5a\x00\x80\xb1\x45\x0d\xf7\x43\x6c\xfa\x22\xdd\x5c\xff\xdf\xea\x8e\x12\x52"
+    st = int(time.time())
+
+    um = '/um/v3' if includeUM else ''
+    exp = st + 6000
+    auth = 'st=%d~exp=%d~acl=%s/*' % (st, exp,
+                                      um) if includeST else 'exp=%d~acl=/*' % exp
+    auth += '~hmac=' + hmac.new(_AKAMAI_ENCRYPTION_KEY,
+                                auth.encode(), hashlib.sha256).hexdigest()
+    return auth
+
+
 def guestToken():
-    resp = urlquick.post(url_constructor("/in/aadhar/v2/firetv/in/user/guest-signup"), json={
-        "idType": "device",
-        "id": str(uuid4()),
-    }).json()
-    return deep_get(resp, "description.userIdentity")
+    hdr = {
+        'hotstarauth': getAuth(includeST=True, persona=False, includeUM=True),
+        'x-hs-platform': 'firetv',
+        'x-country-code': 'IN',
+        'x-hs-appversion': '7.42.0',
+        'x-request-id': str(uuid4()),
+        'x-hs-device-id': str(uuid4()),
+        'Content-Type': 'application/json',
+    }
+    data = {
+        "device_ids": [{"id": "95199a0b-c85a-4055-ba81-ad724e059913", "type": "device_id"}], 
+        "device_meta": {"network_operator": "4g - 4.6 - 50", "os_name": "Windows", "os_version": "10"}
+    }
+    data = json.dumps(data)
+
+    # data = json.dumps(
+    #    {"device_ids": [{"id": str(uuid4()), "type": "device_id"}]}).encode()
+    
+    resp = urlquick.post(url_constructor("/um/v3/users"),
+                         data=data, headers=hdr).json()
+
+    return deep_get(resp, "user_identity")
 
 
 def updateQueryParams(url, params):

@@ -1,12 +1,11 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 from __future__ import unicode_literals
 
 from datetime import datetime
 from codequick import Listitem, Script, Resolver, Route
 from codequick.storage import PersistentDict
-from urlquick import MAX_AGE
 import inputstreamhelper
-from .contants import url_constructor, IMG_THUMB_H_URL, IMG_POSTER_V_URL, IMG_FANART_H_URL, MEDIA_TYPE, BASE_HEADERS, TRAY_IDENTIFIERS, PERSONA_BASE_URL, NAME
+from .contants import IMG_THUMB_H_URL, IMG_POSTER_V_URL, IMG_FANART_H_URL, MEDIA_TYPE, BASE_HEADERS, TRAY_IDENTIFIERS, PERSONA_BASE_URL
 from .api import deep_get, HotstarAPI
 from .utils import updateQueryParams
 from urllib.parse import urlencode
@@ -14,7 +13,6 @@ from pickle import dumps
 from binascii import hexlify
 import urlquick
 import re
-import json
 
 
 class Builder:
