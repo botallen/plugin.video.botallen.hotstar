@@ -5,7 +5,7 @@ import urlquick
 from xbmcgui import Dialog
 import xbmc
 from resources.lib.contants import BASE_HEADERS, url_constructor
-from resources.lib.utils import deep_get, updateQueryParams, qualityFilter, getAuth
+from resources.lib.utils import deep_get, updateQueryParams, qualityFilter, getAuth, guestToken
 from codequick import Script
 from codequick.script import Settings
 from codequick.storage import PersistentDict
@@ -14,6 +14,7 @@ from urllib.request import urlopen, Request
 import json
 from uuid import uuid4
 from base64 import b64decode
+import web_pdb
 
 
 class HotstarAPI:
@@ -94,6 +95,7 @@ class HotstarAPI:
             resp = self.get(url, headers=self._getPlayHeaders(
             ), params=self._getPlayParams(subtag, encryption), max_age=-1)
         """
+        # 
         # data = '{"os_name":"Windows","os_version":"10","app_name":"web","app_version":"7.41.0","platform":"Chrome","platform_version":"106.0.0.0","client_capabilities":{"ads":["non_ssai"],"audio_channel":["stereo"],"dvr":["short"],"package":["dash","hls"],"dynamic_range":["sdr"],"video_codec":["h264"],"encryption":["widevine"],"ladder":["tv"],"container":["fmp4","ts"],"resolution":["hd"]},"drm_parameters":{"widevine_security_level":["SW_SECURE_DECODE","SW_SECURE_CRYPTO"],"hdcp_version":["HDCP_NO_DIGITAL_OUTPUT"]},"resolution":"auto"}'
         data = '{"os_name":"Android","os_version":"7.0","app_name":"android","app_version":"7.41.0","platform":"firetv","platform_version":"7.6.0.0","client_capabilities":{"ads":["non_ssai"],"audio_channel":["stereo"],"dvr":["short"],"package":["dash","hls"],"dynamic_range":["sdr"],"video_codec":["h264"],"encryption":["widevine"],"ladder":["phone"],"container":["fmp4","ts"],"resolution":["fhd","hd"]},"drm_parameters":{"widevine_security_level":["SW_SECURE_DECODE","SW_SECURE_CRYPTO"],"hdcp_version":["HDCP_NO_DIGITAL_OUTPUT"]},"resolution":"auto"}'
         resp = self.post(url, headers=self._getPlayHeaders(includeST=True), params=self._getPlayParams(
@@ -123,7 +125,8 @@ class HotstarAPI:
             if db.get("token"):
                 self._refreshToken()
             else:
-                token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ1bV9hY2Nlc3MiLCJleHAiOjE2Njc4OTA1MzYsImlhdCI6MTY2NzI4NTczNiwiaXNzIjoiVFMiLCJqdGkiOiJlMGEzODZjOThhY2Q0Mzk1ODUzNDFmZDUyYjcwZjY1YiIsInN1YiI6IntcImhJZFwiOlwiMDg0ZjE4NjdmODVlNGYxMDkwODdlODc2YWI4ZWIyYWVcIixcInBJZFwiOlwiZGIxYzFlN2Q2NmFhNDg1ZDg4MzdiOGRhNzAzZWUwOWFcIixcIm5hbWVcIjpcIkd1ZXN0IFVzZXJcIixcImlwXCI6XCIxMDMuMTc3LjEzLjE0NlwiLFwiY291bnRyeUNvZGVcIjpcImluXCIsXCJjdXN0b21lclR5cGVcIjpcIm51XCIsXCJ0eXBlXCI6XCJndWVzdFwiLFwiaXNFbWFpbFZlcmlmaWVkXCI6ZmFsc2UsXCJpc1Bob25lVmVyaWZpZWRcIjpmYWxzZSxcImRldmljZUlkXCI6XCI5NTE5OWEwYi1jODVhLTQwNTUtYmE4MS1hZDcyNGUwNTk5MTNcIixcInByb2ZpbGVcIjpcIkFEVUxUXCIsXCJ2ZXJzaW9uXCI6XCJ2MlwiLFwic3Vic2NyaXB0aW9uc1wiOntcImluXCI6e319LFwiaXNzdWVkQXRcIjoxNjY3Mjg1NzM2ODIzfSIsInZlcnNpb24iOiIxXzAifQ.gziXx1ODiIAL1iKSb0Cxsy4PmCnHSPGWtfa5uLxmEoQ'
+                token = guestToken()
+                # token = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJ1bV9hY2Nlc3MiLCJleHAiOjE2Njk4ODU2ODEsImlhdCI6MTY2OTI4MDg4MSwiaXNzIjoiVFMiLCJqdGkiOiI1OWVjM2MzNDZkMWU0Mzc3OGQ4Y2Y2NjY1ZTcwNTNkYiIsInN1YiI6IntcImhJZFwiOlwiMDg0ZjE4NjdmODVlNGYxMDkwODdlODc2YWI4ZWIyYWVcIixcInBJZFwiOlwiZGIxYzFlN2Q2NmFhNDg1ZDg4MzdiOGRhNzAzZWUwOWFcIixcIm5hbWVcIjpcIkd1ZXN0IFVzZXJcIixcImlwXCI6XCIxMDMuMTc3LjEzLjE0NlwiLFwiY291bnRyeUNvZGVcIjpcImluXCIsXCJjdXN0b21lclR5cGVcIjpcIm51XCIsXCJ0eXBlXCI6XCJndWVzdFwiLFwiaXNFbWFpbFZlcmlmaWVkXCI6ZmFsc2UsXCJpc1Bob25lVmVyaWZpZWRcIjpmYWxzZSxcImRldmljZUlkXCI6XCI5NTE5OWEwYi1jODVhLTQwNTUtYmE4MS1hZDcyNGUwNTk5MTNcIixcInByb2ZpbGVcIjpcIkFEVUxUXCIsXCJ2ZXJzaW9uXCI6XCJ2MlwiLFwic3Vic2NyaXB0aW9uc1wiOntcImluXCI6e319LFwiaXNzdWVkQXRcIjoxNjY5MjgwODgxNDY5fSIsInZlcnNpb24iOiIxXzAifQ.NbhndhIOpaU9XiZZIg0_0jQGH4CWTKJ69QHHvW74VZM'
                 db.clear()
                 db["token"] = token
                 db.flush()
@@ -284,8 +287,9 @@ class HotstarAPI:
         with PersistentDict("userdata.pickle") as db:
             deviceId = db.get("deviceId", HotstarAPI.device_id)
         return {
-            "desired-config": "audio_channel:stereo|container:fmp4|dynamic_range:sdr|encryption:%s|ladder:phone|package:dash|resolution:fhd|%svideo_codec:h264" % (encryption, subTag or ""),
-            "device-id": deviceId
+            "device-id": deviceId,
+            "desired-config": "audio_channel:stereo|container:fmp4|dynamic_range:sdr|encryption:%s|ladder:phone|package:dash|resolution:fhd|%svideo_codec:h264" % (encryption, subTag or "")
+            # "desired-config": "ads:non_ssai|audio_channel:stereo|container:ts|dvr:short|dynamic_range:sdr|encryption:plain|ladder:web|language:hin|package:hls|resolution:fhd|video_codec:h264" 
         }
 
     @staticmethod

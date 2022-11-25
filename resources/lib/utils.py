@@ -57,14 +57,23 @@ def getAuth(includeST=False, persona=False, includeUM=False):
 
 def guestToken():
     hdr = {
-        'hotstarauth': getAuth(includeST=True, persona=False, includeUM=False),
-        'X-HS-Platform': 'PCTV',
-        # 'X-Request-Id': str(uuid4()),
+        'hotstarauth': getAuth(includeST=True, persona=False, includeUM=True),
+        'x-hs-platform': 'firetv',
+        'x-country-code': 'IN',
+        'x-hs-appversion': '7.42.0',
+        'x-request-id': str(uuid4()),
+        'x-hs-device-id': str(uuid4()),
         'Content-Type': 'application/json',
     }
+    data = {
+        "device_ids": [{"id": "95199a0b-c85a-4055-ba81-ad724e059913", "type": "device_id"}], 
+        "device_meta": {"network_operator": "4g - 4.6 - 50", "os_name": "Windows", "os_version": "10"}
+    }
+    data = json.dumps(data)
 
-    data = json.dumps(
-        {"device_ids": [{"id": str(uuid4()), "type": "device_id"}]})
+    # data = json.dumps(
+    #    {"device_ids": [{"id": str(uuid4()), "type": "device_id"}]}).encode()
+    
     resp = urlquick.post(url_constructor("/um/v3/users"),
                          data=data, headers=hdr).json()
 
