@@ -14,7 +14,6 @@ from urllib.request import urlopen, Request
 import json
 from uuid import uuid4
 from base64 import b64decode
-import web_pdb
 
 
 class HotstarAPI:
